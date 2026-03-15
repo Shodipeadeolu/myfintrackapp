@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import { getTransactions } from '../firebase/service'
 import { fmtCurrency, toFirestoreDate } from '../utils/helpers'
@@ -10,26 +10,44 @@ import InviteBanner from '../components/InviteBanner'
 import './Home.css'
 
 export default function Home({ onNavigate }) {
-  const { user, householdId, categories, pendingInvites, handleAcceptInvite, theme, toggleTheme, household } = useApp()
+  const { user, householdId, categories, pendingInvites, handleAcceptInvite, theme, toggleTheme, household, dataLoading } = useApp()
   const [month, setMonth] = useState(new Date())
   const [transactions, setTransactions] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [editTx, setEditTx] = useState(null)
 
-  useEffect(() => { load() }, [month, householdId])
+  // Track previous householdId so we only reload when it actually changes
+  const prevHouseholdId = useRef(undefined)
+
+  useEffect(() => {
+    // Skip if user not ready or householdId hasn't actually changed
+    if (!user) return
+    if (prevHouseholdId.current === householdId) return
+    prevHouseholdId.current = householdId
+    load()
+  }, [month, householdId, user])
 
   const load = async () => {
+    if (!user) return
     setLoading(true)
     try {
       const start = toFirestoreDate(startOfMonth(month))
       const end = toFirestoreDate(endOfMonth(month))
       const txs = await getTransactions(user.uid, householdId, start, end)
       setTransactions(txs)
+    } catch (e) {
+      console.error('Home load error:', e)
     } finally {
       setLoading(false)
     }
   }
+
+  // Reload when month changes
+  useEffect(() => {
+    if (!user) return
+    load()
+  }, [month])
 
   const income = transactions.filter(t => t.type === 'income').reduce((a, t) => a + t.amount, 0)
   const expenses = transactions.filter(t => t.type === 'expense').reduce((a, t) => a + t.amount, 0)
@@ -115,7 +133,7 @@ export default function Home({ onNavigate }) {
               <button className="see-all" onClick={() => onNavigate('transactions')}>See all</button>
             )}
           </div>
-          {loading ? (
+          {loading || dataLoading ? (
             <div className="load-row"><span className="spinner" /></div>
           ) : recent.length === 0 ? (
             <div className="empty-state">

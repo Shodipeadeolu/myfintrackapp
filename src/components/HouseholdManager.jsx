@@ -2,37 +2,40 @@ import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import {
   createHousehold, createInvite, removeMember,
-  updateMemberRole, updateHousehold, setUserProfile
+  updateMemberRole, setUserProfile
 } from '../firebase/service'
 import { ROLES } from '../utils/helpers'
 import './HouseholdManager.css'
 
 export default function HouseholdManager({ onClose }) {
   const { user, profile, household, userRole, refreshHousehold, reloadUser } = useApp()
-  const [view, setView] = useState(household ? 'manage' : 'create')
+  const [view, setView]             = useState(household ? 'manage' : 'create')
+  const [houseName, setHouseName]   = useState('')
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState('record-edit')
+  const [loading, setLoading]       = useState(false)
+  const [msg, setMsg]               = useState({ text: '', type: 'info' }) // type: info | error | success
 
-  // When household loads in (after createHH triggers reloadUser), switch to manage
+  // Switch to manage view once household lands in context after createHH
   useEffect(() => {
     if (household && view === 'create') setView('manage')
   }, [household])
-  const [houseName, setHouseName] = useState('')
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState('record-edit')
-  const [loading, setLoading] = useState(false)
-  const [msg, setMsg] = useState('')
 
   const isOwner = userRole === 'owner'
 
   const createHH = async () => {
     if (!houseName.trim()) return
     setLoading(true)
+    setMsg({ text: '', type: 'info' })
     try {
       const id = await createHousehold(user.uid, houseName.trim())
       await setUserProfile(user.uid, { householdId: id })
-      await reloadUser(id)   // pass id so loadUserData doesn't rely on stale profile
+      // Pass id directly — don't wait for Firestore propagation
+      await reloadUser(id)
       setView('manage')
     } catch (e) {
-      setMsg('Failed to create household. Try again.')
+      console.error('createHH error', e)
+      setMsg({ text: 'Failed to create household: ' + (e?.message || 'Try again.'), type: 'error' })
     } finally {
       setLoading(false)
     }
@@ -41,16 +44,18 @@ export default function HouseholdManager({ onClose }) {
   const sendInvite = async () => {
     if (!inviteEmail.trim()) return
     setLoading(true)
+    setMsg({ text: '', type: 'info' })
     try {
       await createInvite(
         household.id, household.name,
         profile?.displayName || user.email,
-        inviteEmail.trim(), inviteRole
+        inviteEmail.trim().toLowerCase(), inviteRole
       )
-      setMsg(`Invite sent to ${inviteEmail}`)
+      setMsg({ text: `✅ Invite sent to ${inviteEmail}`, type: 'success' })
       setInviteEmail('')
-    } catch {
-      setMsg('Failed to send invite.')
+    } catch (e) {
+      console.error('sendInvite error', e)
+      setMsg({ text: 'Failed to send invite: ' + (e?.message || 'Try again.'), type: 'error' })
     } finally {
       setLoading(false)
     }
@@ -58,23 +63,36 @@ export default function HouseholdManager({ onClose }) {
 
   const kickMember = async (memberId) => {
     if (!window.confirm('Remove this member?')) return
-    await removeMember(household.id, memberId)
-    await refreshHousehold()
+    try {
+      await removeMember(household.id, memberId)
+      await refreshHousehold()
+    } catch (e) {
+      setMsg({ text: 'Failed to remove member.', type: 'error' })
+    }
   }
 
   const changeRole = async (memberId, role) => {
-    await updateMemberRole(household.id, memberId, role)
-    await refreshHousehold()
+    try {
+      await updateMemberRole(household.id, memberId, role)
+      await refreshHousehold()
+    } catch (e) {
+      setMsg({ text: 'Failed to update role.', type: 'error' })
+    }
   }
 
   const leaveHH = async () => {
     if (!window.confirm('Leave this household? Your data will remain but you\'ll lose shared access.')) return
-    await removeMember(household.id, user.uid)
-    await setUserProfile(user.uid, { householdId: null })
-    await reloadUser(null)
-    onClose()
+    try {
+      await removeMember(household.id, user.uid)
+      await setUserProfile(user.uid, { householdId: null })
+      await reloadUser(null)
+      onClose()
+    } catch (e) {
+      setMsg({ text: 'Failed to leave household.', type: 'error' })
+    }
   }
 
+  // ── Create view ──────────────────────────────────────────────
   if (view === 'create') {
     return (
       <>
@@ -98,9 +116,17 @@ export default function HouseholdManager({ onClose }) {
                 onChange={e => setHouseName(e.target.value)}
                 placeholder="e.g. The Smith Family"
                 autoFocus
+                onKeyDown={e => e.key === 'Enter' && createHH()}
               />
             </div>
-            <button className="btn btn-primary btn-full" onClick={createHH} disabled={loading}>
+            {msg.text && (
+              <p className={msg.type === 'error' ? 'form-err' : 'hh-msg'}>{msg.text}</p>
+            )}
+            <button
+              className="btn btn-primary btn-full"
+              onClick={createHH}
+              disabled={loading || !houseName.trim()}
+            >
               {loading ? <span className="spinner" /> : 'Create Household'}
             </button>
           </div>
@@ -109,6 +135,7 @@ export default function HouseholdManager({ onClose }) {
     )
   }
 
+  // ── Manage view ──────────────────────────────────────────────
   const members = household?.members || []
 
   return (
@@ -126,9 +153,18 @@ export default function HouseholdManager({ onClose }) {
           <div className="hh-section-title">Members ({members.length})</div>
           {members.map(m => (
             <div key={m.userId} className="member-row">
-              <div className="member-avatar">{(m.userId === user.uid ? (profile?.displayName || user.email) : m.userId).charAt(0).toUpperCase()}</div>
+              <div className="member-avatar">
+                {(m.userId === user.uid
+                  ? (profile?.displayName || user.email || 'Y')
+                  : (m.email || m.userId || 'M')
+                ).charAt(0).toUpperCase()}
+              </div>
               <div className="member-info">
-                <div className="member-name">{m.userId === user.uid ? (profile?.displayName || 'You') : m.userId.slice(0, 12) + '…'}</div>
+                <div className="member-name">
+                  {m.userId === user.uid
+                    ? (profile?.displayName || 'You')
+                    : (m.email || m.userId.slice(0, 16) + '…')}
+                </div>
                 <div className="member-role-tag">{m.role}</div>
               </div>
               {isOwner && m.userId !== user.uid && (
@@ -157,6 +193,7 @@ export default function HouseholdManager({ onClose }) {
                   value={inviteEmail}
                   onChange={e => setInviteEmail(e.target.value)}
                   placeholder="friend@email.com"
+                  onKeyDown={e => e.key === 'Enter' && sendInvite()}
                 />
               </div>
               <div className="field">
@@ -167,8 +204,14 @@ export default function HouseholdManager({ onClose }) {
                   ))}
                 </select>
               </div>
-              {msg && <p className="hh-msg">{msg}</p>}
-              <button className="btn btn-primary btn-full" onClick={sendInvite} disabled={loading}>
+              {msg.text && (
+                <p className={msg.type === 'error' ? 'form-err' : 'hh-msg'}>{msg.text}</p>
+              )}
+              <button
+                className="btn btn-primary btn-full"
+                onClick={sendInvite}
+                disabled={loading || !inviteEmail.trim()}
+              >
                 {loading ? <span className="spinner" /> : 'Send Invite'}
               </button>
             </>

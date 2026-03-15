@@ -8,15 +8,18 @@ import { db } from './config'
 // ─── Transactions ────────────────────────────────────────────
 export const getTransactions = async (userId, householdId, startDate, endDate) => {
   const uid = householdId || userId
+  // NOTE: combining where(range) + orderBy requires a composite index in Firestore.
+  // We sort client-side instead so the app works without index configuration.
   const q = query(
     collection(db, 'transactions'),
     where('ownerId', '==', uid),
     where('date', '>=', startDate),
-    where('date', '<=', endDate),
-    orderBy('date', 'desc')
+    where('date', '<=', endDate)
   )
   const snap = await getDocs(q)
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  // Sort descending by date client-side
+  return docs.sort((a, b) => b.date.localeCompare(a.date))
 }
 
 export const addTransaction = async (userId, householdId, data) => {
@@ -38,7 +41,7 @@ export const deleteTransaction = async (id) => {
 
 export const batchAddTransactions = async (userId, householdId, transactions, onProgress) => {
   const ownerId = householdId || userId
-  const BATCH_SIZE = 400
+  const BATCH_SIZE = 499 // Firestore hard limit is 500 ops per batch
   let imported = 0
   for (let i = 0; i < transactions.length; i += BATCH_SIZE) {
     const batch = writeBatch(db)
@@ -50,6 +53,8 @@ export const batchAddTransactions = async (userId, householdId, transactions, on
     await batch.commit()
     imported += chunk.length
     onProgress && onProgress(Math.round((imported / transactions.length) * 100))
+    // Yield to event loop so React can repaint the progress bar
+    await new Promise(r => setTimeout(r, 0))
   }
   return imported
 }
@@ -124,12 +129,15 @@ export const updateHousehold = async (id, data) => {
 }
 
 export const getHouseholdInvites = async (email) => {
+  // Compound query on inviteeEmail + status needs a composite index.
+  // Query only by email and filter status client-side to avoid index requirement.
   const snap = await getDocs(query(
     collection(db, 'invites'),
-    where('inviteeEmail', '==', email),
-    where('status', '==', 'pending')
+    where('inviteeEmail', '==', email.toLowerCase())
   ))
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(d => d.status === 'pending')
 }
 
 export const createInvite = async (householdId, householdName, inviterName, inviteeEmail, role) => {
@@ -137,7 +145,7 @@ export const createInvite = async (householdId, householdName, inviterName, invi
     householdId,
     householdName,
     inviterName,
-    inviteeEmail,
+    inviteeEmail: inviteeEmail.toLowerCase(),
     role,
     status: 'pending',
     createdAt: serverTimestamp()
@@ -146,9 +154,7 @@ export const createInvite = async (householdId, householdName, inviterName, invi
 
 export const acceptInvite = async (inviteId, inviteData, userId) => {
   const batch = writeBatch(db)
-  // Update invite status
   batch.update(doc(db, 'invites', inviteId), { status: 'accepted' })
-  // Add member to household
   const household = await getHousehold(inviteData.householdId)
   const members = [...(household.members || []), {
     userId,

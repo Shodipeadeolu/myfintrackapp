@@ -11,30 +11,30 @@ import {
 const AppContext = createContext(null)
 
 export function AppProvider({ children }) {
-  const [user, setUser] = useState(null)
-  const [profile, setProfile] = useState(null)
+  const [user, setUser]               = useState(null)
+  const [profile, setProfile]         = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
-  const [theme, setTheme] = useState(() => localStorage.getItem('ft-theme') || 'light')
-  const [categories, setCategories] = useState([])
-  const [household, setHousehold] = useState(null)
-  const [pendingInvites, setPendingInvites] = useState([])
   const [dataLoading, setDataLoading] = useState(false)
+  const [theme, setTheme]             = useState(() => localStorage.getItem('ft-theme') || 'light')
+  const [categories, setCategories]   = useState([])
+  const [household, setHousehold]     = useState(null)
+  const [pendingInvites, setPendingInvites] = useState([])
 
-  // Theme
+  // ── Theme ────────────────────────────────────────────────────
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('ft-theme', theme)
   }, [theme])
-
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light')
 
-  // Auth listener — set authLoading false as soon as we know who the user is,
-  // then load their data in the background (no full-screen spinner for data)
+  // ── Auth listener ────────────────────────────────────────────
+  // Flip authLoading immediately so the app shell renders without waiting
+  // for Firestore. Data loads in the background.
   useEffect(() => {
-    return onAuthStateChanged(auth, async (u) => {
+    return onAuthStateChanged(auth, (u) => {
       setUser(u)
       if (u) {
-        loadUserData(u) // intentionally not awaited
+        loadUserData(u) // not awaited — intentional
       } else {
         setProfile(null)
         setCategories([])
@@ -45,43 +45,46 @@ export function AppProvider({ children }) {
     })
   }, [])
 
+  // ── Core data loader ─────────────────────────────────────────
+  // overrideHouseholdId: pass after create/join/leave so we don't
+  // rely on the just-written Firestore doc being immediately consistent.
   const loadUserData = async (u, overrideHouseholdId) => {
     setDataLoading(true)
     try {
-      // Profile
+      // 1. Profile — single doc read, fast
       let prof = await getUserProfile(u.uid)
       if (!prof) {
         prof = { displayName: u.displayName || '', email: u.email, createdAt: new Date().toISOString() }
         await setUserProfile(u.uid, prof)
       }
-      setProfile(prof)
 
-      // Use override (e.g. right after creating/joining a household) or profile value
-      const hhId = overrideHouseholdId !== undefined ? overrideHouseholdId : (prof.householdId || null)
+      // If an override was supplied (right after household create/leave),
+      // inject it directly so we don't wait for Firestore propagation
+      const hhId = overrideHouseholdId !== undefined
+        ? overrideHouseholdId
+        : (prof.householdId || null)
 
-      // Household
-      let hh = null
-      if (hhId) {
-        hh = await getHousehold(hhId)
-        setHousehold(hh)
-      } else {
-        setHousehold(null)
-      }
+      // Merge the householdId into the profile we're about to set in state
+      const mergedProf = hhId !== undefined ? { ...prof, householdId: hhId || undefined } : prof
+      setProfile(mergedProf)
 
-      // Categories
-      const cats = await getCategories(u.uid, hhId)
+      // 2. Parallel fetch — household + categories + invites all at once
+      const [hh, cats, invites] = await Promise.all([
+        hhId ? getHousehold(hhId) : Promise.resolve(null),
+        getCategories(u.uid, hhId),
+        u.email ? getHouseholdInvites(u.email) : Promise.resolve([])
+      ])
+
+      setHousehold(hh)
+      setPendingInvites(invites)
+
+      // Seed default categories for brand-new solo users
       if (cats.length === 0 && !hhId) {
         await seedDefaultCategories(u.uid)
-        const freshCats = await getCategories(u.uid, null)
-        setCategories(freshCats)
+        const fresh = await getCategories(u.uid, null)
+        setCategories(fresh)
       } else {
         setCategories(cats)
-      }
-
-      // Pending invites
-      if (u.email) {
-        const invites = await getHouseholdInvites(u.email)
-        setPendingInvites(invites)
       }
     } catch (e) {
       console.error('loadUserData error', e)
@@ -115,7 +118,6 @@ export function AppProvider({ children }) {
   const userRole = household
     ? (household.members.find(m => m.userId === user?.uid)?.role || 'view-only')
     : 'owner'
-
   const canWrite = ['owner', 'all-access', 'record-edit'].includes(userRole)
 
   return (

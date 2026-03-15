@@ -1,16 +1,18 @@
 import { useState, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import { parseTransactionXLSX } from '../utils/helpers'
-import { batchAddTransactions, addCategory, getCategories } from '../firebase/service'
+import { batchAddTransactions, getCategories } from '../firebase/service'
+import { collection, doc, writeBatch, serverTimestamp } from 'firebase/firestore'
+import { db } from '../firebase/config'
 import './ImportSheet.css'
 
 export default function ImportSheet({ onClose }) {
   const { user, householdId, categories, refreshCategories } = useApp()
-  const [file, setFile] = useState(null)
+  const [file, setFile]       = useState(null)
   const [preview, setPreview] = useState(null)
   const [progress, setProgress] = useState(0)
-  const [status, setStatus] = useState('idle') // idle | parsing | importing | done | error
-  const [msg, setMsg] = useState('')
+  const [status, setStatus]   = useState('idle') // idle | parsing | importing | done | error
+  const [msg, setMsg]         = useState('')
   const fileRef = useRef()
 
   const handleFile = async (f) => {
@@ -30,39 +32,48 @@ export default function ImportSheet({ onClose }) {
     if (!preview) return
     setStatus('importing')
     setProgress(0)
+    setMsg('')
+
     try {
-      // Batch-add all new categories in one pass
+      // ── 1. Add new categories via a single writeBatch ──────────
       const existingNames = new Set(categories.map(c => c.name))
-      const newCats = Object.entries(preview.categoryMap).filter(([name]) => !existingNames.has(name))
+      const newCats = Object.entries(preview.categoryMap)
+        .filter(([name]) => !existingNames.has(name))
 
       if (newCats.length > 0) {
         setMsg(`Adding ${newCats.length} new categories…`)
-        // Add categories in parallel instead of sequentially
-        await Promise.all(
-          newCats.map(([catName, catData]) =>
-            addCategory(user.uid, householdId, {
-              name: catName,
-              icon: '📦',
-              type: catData.type,
-              subcategories: catData.subcategories
-            })
-          )
-        )
+        const ownerId = householdId || user.uid
+        const catBatch = writeBatch(db)
+        newCats.forEach(([catName, catData]) => {
+          const ref = doc(collection(db, 'categories'))
+          catBatch.set(ref, {
+            name: catName,
+            icon: '📦',
+            type: catData.type,
+            subcategories: catData.subcategories,
+            ownerId,
+            createdBy: user.uid,
+            createdAt: serverTimestamp()
+          })
+        })
+        await catBatch.commit()
         await refreshCategories()
+        setMsg('')
       }
 
-      setMsg('')
+      // ── 2. Import transactions in batches ──────────────────────
       const count = await batchAddTransactions(
         user.uid, householdId,
         preview.transactions,
-        (pct) => setProgress(pct)
+        (pct) => { setProgress(pct); setMsg('') }
       )
+
       setStatus('done')
       setMsg(`✅ Imported ${count} transactions successfully!`)
     } catch (e) {
       console.error('Import error', e)
       setStatus('error')
-      setMsg('Import failed: ' + (e.message || 'Please try again.'))
+      setMsg('Import failed: ' + (e?.message || 'Please try again.'))
     }
   }
 
@@ -84,10 +95,7 @@ export default function ImportSheet({ onClose }) {
                 <p style={{ marginTop: 8 }}>Duplicates are automatically skipped. Transfers and balance rows are excluded.</p>
               </div>
 
-              <button
-                className="drop-zone"
-                onClick={() => fileRef.current?.click()}
-              >
+              <button className="drop-zone" onClick={() => fileRef.current?.click()}>
                 <span className="drop-icon">📂</span>
                 <span className="drop-label">
                   {file ? file.name : 'Tap to choose XLSX file'}
