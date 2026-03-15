@@ -30,58 +30,132 @@ export const getDateRange = (period, anchor) => {
 export const toFirestoreDate = (d) => format(d, 'yyyy-MM-dd')
 
 // ─── Import XLSX ──────────────────────────────────────────────
+
+// Strip leading emojis/symbols from category names
+const cleanCategoryName = (name) => {
+  if (!name) return ''
+  return String(name)
+    .replace(/^[\u{1F000}-\u{1FFFF}\u{2600}-\u{27FF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\uFE00-\uFE0F\s]+/gu, '')
+    .trim()
+    || String(name).trim() // fallback to original if stripping removed everything
+}
+
+// Parse a date value that could be a JS Date object, Excel serial, or string
+const parseDate = (raw) => {
+  if (!raw) return null
+  // Already a JS Date (happens with openpyxl / xlsx cellDates:true)
+  if (raw instanceof Date) return format(raw, 'yyyy-MM-dd')
+  // Excel serial number
+  if (typeof raw === 'number') {
+    const d = XLSX.SSF.parse_date_code(raw)
+    if (d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`
+  }
+  // String
+  try {
+    const d = new Date(raw)
+    if (!isNaN(d)) return format(d, 'yyyy-MM-dd')
+  } catch {}
+  return null
+}
+
 export const parseTransactionXLSX = (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
-        const wb = XLSX.read(e.target.result, { type: 'binary' })
+        const wb = XLSX.read(e.target.result, { type: 'binary', cellDates: true })
         const ws = wb.Sheets[wb.SheetNames[0]]
         const rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
 
-        const skipKeywords = ['transfer', 'balance', 'opening', 'closing']
+        if (rows.length === 0) return resolve({ transactions: [], categoryMap: {} })
+
+        // Detect format by checking header keys
+        const headers = Object.keys(rows[0]).map(h => h.trim().toLowerCase())
+        const isNativeFormat = headers.includes('period') && headers.includes('income/expense')
+
+        // Types to skip entirely in native format
+        const skipTypes = new Set(['Transfer-In', 'Transfer-Out', 'Income Balance', 'Expense Balance'])
+
         const seen = new Set()
         const transactions = []
         const categoryMap = {}
 
         rows.forEach(row => {
-          const desc = String(row.Description || row.description || row.Memo || row.memo || '').trim()
-          const amtRaw = row.Amount || row.amount || row.Debit || row.Credit || 0
-          const amt = parseFloat(String(amtRaw).replace(/[^0-9.-]/g, ''))
-          const dateRaw = row.Date || row.date || row['Transaction Date'] || ''
-          const cat = String(row.Category || row.category || 'Miscellaneous').trim()
-          const subcat = String(row.Subcategory || row.subcategory || '').trim()
+          let dateStr, amtRaw, type, catRaw, subcat, note
 
-          if (!amt || isNaN(amt)) return
-          if (skipKeywords.some(k => desc.toLowerCase().includes(k))) return
+          if (isNativeFormat) {
+            // ── Native app export format ──────────────────────────
+            // Period | Accounts | Category | Subcategory | Note | NGN | Income/Expense | ...
+            const txType = String(row['Income/Expense'] || row['income/expense'] || '').trim()
+            if (skipTypes.has(txType)) return
 
-          const hash = SparkMD5.hash(`${dateRaw}|${desc}|${amt}`)
-          if (seen.has(hash)) return
-          seen.add(hash)
+            dateStr = parseDate(row['Period'] || row['period'])
+            amtRaw  = row['NGN'] || row['ngn'] || row['Amount'] || row['amount'] || 0
+            catRaw  = row['Category'] || row['category'] || 'Miscellaneous'
+            subcat  = String(row['Subcategory'] || row['subcategory'] || '').trim()
+            note    = String(row['Note'] || row['note'] || '').trim()
 
-          let dateStr = ''
-          try {
-            const parsed = new Date(dateRaw)
-            dateStr = format(parsed, 'yyyy-MM-dd')
-          } catch {
-            return
+            const amt = parseFloat(String(amtRaw).replace(/[^0-9.-]/g, ''))
+            if (!amt || isNaN(amt)) return
+
+            // Negative Exp. = refund → treat as income
+            if (txType === 'Income' || (txType === 'Exp.' && amt < 0)) {
+              type = 'income'
+            } else {
+              type = 'expense'
+            }
+
+            const absAmt = Math.abs(amt)
+            const cat = cleanCategoryName(catRaw)
+            if (!cat) return
+
+            const hash = SparkMD5.hash(`${dateStr}|${cat}|${subcat}|${absAmt}|${type}`)
+            if (seen.has(hash)) return
+            seen.add(hash)
+
+            if (!categoryMap[cat]) categoryMap[cat] = { type, subcategories: [] }
+            if (subcat && !categoryMap[cat].subcategories.includes(subcat))
+              categoryMap[cat].subcategories.push(subcat)
+
+            transactions.push({ amount: absAmt, type, category: cat, subcategory: subcat, note, date: dateStr, hash })
+
+          } else {
+            // ── Standard / generic format ─────────────────────────
+            // Date | Description | Amount | Category | Subcategory | Type (optional)
+            const dateRaw = row.Date || row.date || row['Transaction Date'] || ''
+            dateStr = parseDate(dateRaw)
+            if (!dateStr) return
+
+            const desc  = String(row.Description || row.description || row.Memo || row.memo || '').trim()
+            amtRaw      = row.Amount || row.amount || row.Debit || row.Credit || 0
+            catRaw      = row.Category || row.category || 'Miscellaneous'
+            subcat      = String(row.Subcategory || row.subcategory || '').trim()
+            note        = desc
+
+            const amt = parseFloat(String(amtRaw).replace(/[^0-9.-]/g, ''))
+            if (!amt || isNaN(amt)) return
+
+            // Honour explicit Type column if present, else infer from sign
+            const typeCol = String(row.Type || row.type || '').toLowerCase()
+            if (typeCol === 'income') type = 'income'
+            else if (typeCol === 'expense') type = 'expense'
+            else type = amt < 0 ? 'expense' : 'income'
+
+            const cat = cleanCategoryName(catRaw)
+            const hash = SparkMD5.hash(`${dateStr}|${desc}|${Math.abs(amt)}`)
+            if (seen.has(hash)) return
+            seen.add(hash)
+
+            if (!categoryMap[cat]) categoryMap[cat] = { type, subcategories: [] }
+            if (subcat && !categoryMap[cat].subcategories.includes(subcat))
+              categoryMap[cat].subcategories.push(subcat)
+
+            transactions.push({ amount: Math.abs(amt), type, category: cat, subcategory: subcat, note, date: dateStr, hash })
           }
-
-          const type = amt < 0 ? 'expense' : 'income'
-          if (!categoryMap[cat]) categoryMap[cat] = { type, subcategories: [] }
-          if (subcat && !categoryMap[cat].subcategories.includes(subcat))
-            categoryMap[cat].subcategories.push(subcat)
-
-          transactions.push({
-            amount: Math.abs(amt),
-            type,
-            category: cat,
-            subcategory: subcat,
-            note: desc,
-            date: dateStr,
-            hash
-          })
         })
+
+        // Placeholder to close the forEach — real closing brace below
+        void 0
 
         resolve({ transactions, categoryMap })
       } catch (err) {
