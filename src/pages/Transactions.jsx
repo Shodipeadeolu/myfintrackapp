@@ -9,7 +9,7 @@ import AddTransaction from '../components/AddTransaction'
 import './Transactions.css'
 
 export default function Transactions() {
-  const { user, householdId, categories } = useApp()
+  const { user, householdId, categories, reloadTrigger } = useApp()
   const [month, setMonth] = useState(new Date())
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
@@ -17,7 +17,7 @@ export default function Transactions() {
   const [search, setSearch] = useState('')
   const [editTx, setEditTx] = useState(null)
 
-  useEffect(() => { load() }, [month, householdId])
+  useEffect(() => { load() }, [month, householdId, reloadTrigger])
 
   const load = async () => {
     setLoading(true)

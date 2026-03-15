@@ -9,7 +9,7 @@ import CategoryPicker from '../components/CategoryPicker'
 import './Budgets.css'
 
 export default function Budgets() {
-  const { user, householdId, categories, canWrite } = useApp()
+  const { user, householdId, categories, canWrite, reloadTrigger } = useApp()
   const [month, setMonth] = useState(new Date())
   const [budgets, setBudgets] = useState([])
   const [spending, setSpending] = useState({}) // { categoryName: totalSpent }

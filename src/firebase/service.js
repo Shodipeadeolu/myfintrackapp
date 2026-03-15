@@ -118,7 +118,7 @@ export const createHousehold = async (userId, name) => {
   await setDoc(ref, {
     name,
     ownerId: userId,
-    members: [{ userId, role: 'owner', joinedAt: serverTimestamp() }],
+    members: [{ userId, role: 'owner', joinedAt: new Date().toISOString() }],
     createdAt: serverTimestamp()
   })
   return ref.id
@@ -159,7 +159,7 @@ export const acceptInvite = async (inviteId, inviteData, userId) => {
   const members = [...(household.members || []), {
     userId,
     role: inviteData.role,
-    joinedAt: serverTimestamp()
+    joinedAt: new Date().toISOString()   // serverTimestamp() not allowed inside arrays
   }]
   batch.update(doc(db, 'households', inviteData.householdId), { members })
   await batch.commit()

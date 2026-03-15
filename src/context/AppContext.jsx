@@ -15,6 +15,7 @@ export function AppProvider({ children }) {
   const [profile, setProfile]         = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [dataLoading, setDataLoading] = useState(false)
+  const [reloadTrigger, setReloadTrigger] = useState(0)
   const [theme, setTheme]             = useState(() => localStorage.getItem('ft-theme') || 'light')
   const [categories, setCategories]   = useState([])
   const [household, setHousehold]     = useState(null)
@@ -123,6 +124,8 @@ export function AppProvider({ children }) {
   return (
     <AppContext.Provider value={{
       user, profile, authLoading, dataLoading,
+      reloadTrigger,
+      triggerReload: () => setReloadTrigger(n => n + 1),
       theme, toggleTheme,
       categories, setCategories, refreshCategories,
       household, householdId, userRole, canWrite, refreshHousehold,

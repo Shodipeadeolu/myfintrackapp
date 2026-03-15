@@ -10,7 +10,7 @@ import InviteBanner from '../components/InviteBanner'
 import './Home.css'
 
 export default function Home({ onNavigate }) {
-  const { user, householdId, categories, pendingInvites, handleAcceptInvite, theme, toggleTheme, household, dataLoading } = useApp()
+  const { user, householdId, categories, pendingInvites, handleAcceptInvite, theme, toggleTheme, household, dataLoading, reloadTrigger } = useApp()
   const [month, setMonth] = useState(new Date())
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(false)
@@ -43,11 +43,11 @@ export default function Home({ onNavigate }) {
     }
   }
 
-  // Reload when month changes
+  // Reload when month changes or after import
   useEffect(() => {
     if (!user) return
     load()
-  }, [month])
+  }, [month, reloadTrigger])
 
   const income = transactions.filter(t => t.type === 'income').reduce((a, t) => a + t.amount, 0)
   const expenses = transactions.filter(t => t.type === 'expense').reduce((a, t) => a + t.amount, 0)

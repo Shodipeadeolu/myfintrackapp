@@ -1,13 +1,13 @@
 import { useState, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import { parseTransactionXLSX } from '../utils/helpers'
-import { batchAddTransactions, getCategories } from '../firebase/service'
+import { batchAddTransactions } from '../firebase/service'
 import { collection, doc, writeBatch, serverTimestamp } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import './ImportSheet.css'
 
 export default function ImportSheet({ onClose }) {
-  const { user, householdId, categories, refreshCategories } = useApp()
+  const { user, householdId, categories, refreshCategories, triggerReload } = useApp()
   const [file, setFile]       = useState(null)
   const [preview, setPreview] = useState(null)
   const [progress, setProgress] = useState(0)
@@ -70,6 +70,7 @@ export default function ImportSheet({ onClose }) {
 
       setStatus('done')
       setMsg(`✅ Imported ${count} transactions successfully!`)
+      triggerReload() // tell Home/Transactions/Stats pages to refresh
     } catch (e) {
       console.error('Import error', e)
       setStatus('error')

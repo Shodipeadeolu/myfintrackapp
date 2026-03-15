@@ -13,7 +13,7 @@ const PERIOD_OPTIONS = ['Weekly', 'Monthly', 'Annually', 'Custom']
 const COLORS = ['#e8421a','#f07040','#f5a070','#fad0b8','#1a7a4a','#3aaa6a','#1a4fa8','#4a80e8','#c47b0a','#f0b030']
 
 export default function Stats() {
-  const { user, householdId, categories } = useApp()
+  const { user, householdId, categories, reloadTrigger } = useApp()
   const [period, setPeriod] = useState('Monthly')
   const [anchor, setAnchor] = useState(new Date())
   const [customStart, setCustomStart] = useState(toFirestoreDate(startOfMonth(new Date())))
@@ -26,7 +26,7 @@ export default function Stats() {
   const [drillTxs, setDrillTxs] = useState([])
   const [editTx, setEditTx] = useState(null)
 
-  useEffect(() => { load() }, [period, anchor, customStart, customEnd, householdId])
+  useEffect(() => { load() }, [period, anchor, customStart, customEnd, householdId, reloadTrigger])
 
   const getRange = () => {
     if (period === 'Custom') return { start: customStart, end: customEnd }
