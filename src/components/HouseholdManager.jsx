@@ -2,26 +2,31 @@ import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import {
   createHousehold, createInvite, removeMember,
-  updateMemberRole, setUserProfile
+  updateMemberRole, setUserProfile, getHousehold
 } from '../firebase/service'
 import { ROLES } from '../utils/helpers'
 import './HouseholdManager.css'
 
 export default function HouseholdManager({ onClose }) {
   const { user, profile, household, userRole, refreshHousehold, reloadUser } = useApp()
-  const [view, setView]             = useState(household ? 'manage' : 'create')
-  const [houseName, setHouseName]   = useState('')
+  const [view, setView]               = useState(household ? 'manage' : 'create')
+  const [localHousehold, setLocalHousehold] = useState(household) // local copy so we don't depend on context timing
+  const [houseName, setHouseName]     = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState('record-edit')
-  const [loading, setLoading]       = useState(false)
-  const [msg, setMsg]               = useState({ text: '', type: 'info' }) // type: info | error | success
+  const [inviteRole, setInviteRole]   = useState('record-edit')
+  const [loading, setLoading]         = useState(false)
+  const [msg, setMsg]                 = useState({ text: '', type: 'info' })
 
-  // Switch to manage view once household lands in context after createHH
+  // Sync localHousehold when context household updates
   useEffect(() => {
-    if (household && view === 'create') setView('manage')
+    if (household) {
+      setLocalHousehold(household)
+      if (view === 'create') setView('manage')
+    }
   }, [household])
 
   const isOwner = userRole === 'owner'
+  const hh = localHousehold // always use localHousehold — never household directly
 
   const createHH = async () => {
     if (!houseName.trim()) return
@@ -30,9 +35,12 @@ export default function HouseholdManager({ onClose }) {
     try {
       const id = await createHousehold(user.uid, houseName.trim())
       await setUserProfile(user.uid, { householdId: id })
-      // Pass id directly — don't wait for Firestore propagation
-      await reloadUser(id)
+      // Fetch the household immediately into local state — don't wait for context
+      const freshHH = await getHousehold(id)
+      setLocalHousehold(freshHH)
       setView('manage')
+      // Reload context in background
+      reloadUser(id)
     } catch (e) {
       console.error('createHH error', e)
       setMsg({ text: 'Failed to create household: ' + (e?.message || 'Try again.'), type: 'error' })
@@ -43,13 +51,18 @@ export default function HouseholdManager({ onClose }) {
 
   const sendInvite = async () => {
     if (!inviteEmail.trim()) return
+    if (!hh?.id) {
+      setMsg({ text: 'Household not ready yet. Please wait a moment and try again.', type: 'error' })
+      return
+    }
     setLoading(true)
     setMsg({ text: '', type: 'info' })
     try {
       await createInvite(
-        household.id, household.name,
+        hh.id, hh.name,
         profile?.displayName || user.email,
-        inviteEmail.trim().toLowerCase(), inviteRole
+        inviteEmail.trim().toLowerCase(),
+        inviteRole
       )
       setMsg({ text: `✅ Invite sent to ${inviteEmail}`, type: 'success' })
       setInviteEmail('')
@@ -64,8 +77,10 @@ export default function HouseholdManager({ onClose }) {
   const kickMember = async (memberId) => {
     if (!window.confirm('Remove this member?')) return
     try {
-      await removeMember(household.id, memberId)
-      await refreshHousehold()
+      await removeMember(hh.id, memberId)
+      const fresh = await getHousehold(hh.id)
+      setLocalHousehold(fresh)
+      refreshHousehold()
     } catch (e) {
       setMsg({ text: 'Failed to remove member.', type: 'error' })
     }
@@ -73,17 +88,19 @@ export default function HouseholdManager({ onClose }) {
 
   const changeRole = async (memberId, role) => {
     try {
-      await updateMemberRole(household.id, memberId, role)
-      await refreshHousehold()
+      await updateMemberRole(hh.id, memberId, role)
+      const fresh = await getHousehold(hh.id)
+      setLocalHousehold(fresh)
+      refreshHousehold()
     } catch (e) {
       setMsg({ text: 'Failed to update role.', type: 'error' })
     }
   }
 
   const leaveHH = async () => {
-    if (!window.confirm('Leave this household? Your data will remain but you\'ll lose shared access.')) return
+    if (!window.confirm("Leave this household? Your data will remain but you'll lose shared access.")) return
     try {
-      await removeMember(household.id, user.uid)
+      await removeMember(hh.id, user.uid)
       await setUserProfile(user.uid, { householdId: null })
       await reloadUser(null)
       onClose()
@@ -92,7 +109,7 @@ export default function HouseholdManager({ onClose }) {
     }
   }
 
-  // ── Create view ──────────────────────────────────────────────
+  // ── Create view ───────────────────────────────────────────
   if (view === 'create') {
     return (
       <>
@@ -114,14 +131,12 @@ export default function HouseholdManager({ onClose }) {
               <input
                 value={houseName}
                 onChange={e => setHouseName(e.target.value)}
-                placeholder="e.g. The Smith Family"
+                placeholder="e.g. The Shodipe Family"
                 autoFocus
                 onKeyDown={e => e.key === 'Enter' && createHH()}
               />
             </div>
-            {msg.text && (
-              <p className={msg.type === 'error' ? 'form-err' : 'hh-msg'}>{msg.text}</p>
-            )}
+            {msg.text && <p className={msg.type === 'error' ? 'form-err' : 'hh-msg'}>{msg.text}</p>}
             <button
               className="btn btn-primary btn-full"
               onClick={createHH}
@@ -135,8 +150,28 @@ export default function HouseholdManager({ onClose }) {
     )
   }
 
-  // ── Manage view ──────────────────────────────────────────────
-  const members = household?.members || []
+  // ── Manage view — loading guard ────────────────────────────
+  if (!hh) {
+    return (
+      <>
+        <div className="sheet-overlay" onClick={onClose} />
+        <div className="sheet">
+          <div className="sheet-handle" />
+          <div className="sheet-header">
+            <button className="btn btn-ghost" onClick={onClose}>✕</button>
+            <span className="sheet-title">Household</span>
+            <span style={{ width: 40 }} />
+          </div>
+          <div className="sheet-body">
+            <div className="load-row"><span className="spinner" /></div>
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  // ── Manage view ────────────────────────────────────────────
+  const members = hh.members || []
 
   return (
     <>
@@ -145,18 +180,17 @@ export default function HouseholdManager({ onClose }) {
         <div className="sheet-handle" />
         <div className="sheet-header">
           <button className="btn btn-ghost" onClick={onClose}>✕</button>
-          <span className="sheet-title">{household?.name}</span>
+          <span className="sheet-title">{hh.name}</span>
           <span style={{ width: 40 }} />
         </div>
         <div className="sheet-body">
-          {/* Members */}
           <div className="hh-section-title">Members ({members.length})</div>
           {members.map(m => (
             <div key={m.userId} className="member-row">
               <div className="member-avatar">
                 {(m.userId === user.uid
                   ? (profile?.displayName || user.email || 'Y')
-                  : (m.email || m.userId || 'M')
+                  : (m.email || m.userId)
                 ).charAt(0).toUpperCase()}
               </div>
               <div className="member-info">
@@ -182,7 +216,6 @@ export default function HouseholdManager({ onClose }) {
             </div>
           ))}
 
-          {/* Invite */}
           {isOwner && (
             <>
               <div className="hh-section-title" style={{ marginTop: 20 }}>Invite Member</div>
@@ -217,7 +250,6 @@ export default function HouseholdManager({ onClose }) {
             </>
           )}
 
-          {/* Leave */}
           {!isOwner && (
             <button className="btn btn-danger btn-full" style={{ marginTop: 24 }} onClick={leaveHH}>
               Leave Household

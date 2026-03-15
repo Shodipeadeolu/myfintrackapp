@@ -73,8 +73,13 @@ export default function ImportSheet({ onClose }) {
       triggerReload() // tell Home/Transactions/Stats pages to refresh
     } catch (e) {
       console.error('Import error', e)
+      const isPermissions = e?.message?.toLowerCase().includes('permission') ||
+                            e?.code === 'permission-denied'
       setStatus('error')
-      setMsg('Import failed: ' + (e?.message || 'Please try again.'))
+      setMsg(isPermissions
+        ? '🔒 Firestore permissions error. Go to Firebase Console → Firestore → Rules and paste the rules from firestore.rules in your repo. Then try again.'
+        : 'Import failed: ' + (e?.message || 'Please try again.')
+      )
     }
   }
 
