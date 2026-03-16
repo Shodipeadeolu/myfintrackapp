@@ -9,7 +9,7 @@ import CategoryPicker from '../components/CategoryPicker'
 import './Budgets.css'
 
 export default function Budgets() {
-  const { user, householdId, categories, canWrite, reloadTrigger } = useApp()
+  const { user, householdId, categories, canWrite, reloadTrigger, currency } = useApp()
   const [month, setMonth] = useState(new Date())
   const [budgets, setBudgets] = useState([])
   const [spending, setSpending] = useState({}) // { categoryName: totalSpent }
@@ -82,18 +82,18 @@ export default function Budgets() {
                 <div className="bsc-row">
                   <div className="bsc-item">
                     <div className="bsc-label">Budgeted</div>
-                    <div className="bsc-value">{fmtCurrency(totalBudgeted)}</div>
+                    <div className="bsc-value">{fmtCurrency(totalBudgeted, currency)}</div>
                   </div>
                   <div className="bsc-item">
                     <div className="bsc-label">Spent</div>
                     <div className={`bsc-value ${totalSpent > totalBudgeted ? 'over' : ''}`}>
-                      {fmtCurrency(totalSpent)}
+                      {fmtCurrency(totalSpent, currency)}
                     </div>
                   </div>
                   <div className="bsc-item">
                     <div className="bsc-label">{totalRemaining < 0 ? 'Over by' : 'Left'}</div>
                     <div className={`bsc-value ${totalRemaining < 0 ? 'over' : 'under'}`}>
-                      {fmtCurrency(Math.abs(totalRemaining))}
+                      {fmtCurrency(Math.abs(totalRemaining), currency)}
                     </div>
                   </div>
                 </div>
@@ -140,9 +140,9 @@ export default function Budgets() {
                         </div>
                         <div className="bc-right">
                           <div className={`bc-spent ${over ? 'over' : ''}`}>
-                            {fmtCurrency(spent)}
+                            {fmtCurrency(spent, currency)}
                           </div>
-                          <div className="bc-limit">of {fmtCurrency(budget.amount)}</div>
+                          <div className="bc-limit">of {fmtCurrency(budget.amount, currency)}</div>
                         </div>
                       </div>
 
@@ -153,10 +153,10 @@ export default function Budgets() {
                       <div className="bc-bottom">
                         <span className={`bc-badge ${status}`}>
                           {over
-                            ? `Over by ${fmtCurrency(Math.abs(remaining))}`
+                            ? `Over by ${fmtCurrency(Math.abs(remaining), currency)}`
                             : pct >= 80
-                              ? `⚠ ${fmtCurrency(remaining)} left`
-                              : `${fmtCurrency(remaining)} left`
+                              ? `⚠ ${fmtCurrency(remaining, currency)} left`
+                              : `${fmtCurrency(remaining, currency)} left`
                           }
                         </span>
                         <span className="bc-pct">{Math.round(pct)}%</span>

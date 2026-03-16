@@ -10,7 +10,7 @@ import InviteBanner from '../components/InviteBanner'
 import './Home.css'
 
 export default function Home({ onNavigate }) {
-  const { user, householdId, categories, pendingInvites, handleAcceptInvite, theme, toggleTheme, household, dataLoading, reloadTrigger } = useApp()
+  const { user, householdId, categories, pendingInvites, handleAcceptInvite, theme, toggleTheme, household, dataLoading, reloadTrigger, currency } = useApp()
   const [month, setMonth] = useState(new Date())
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(false)
@@ -84,14 +84,14 @@ export default function Home({ onNavigate }) {
           </div>
           <div className="balance-label">Net Balance</div>
           <div className={`balance-amount ${balance < 0 ? 'negative' : ''}`}>
-            {fmtCurrency(balance)}
+            {fmtCurrency(balance, currency)}
           </div>
           <div className="summary-row">
             <div className="summary-item income">
               <span className="summary-icon">↓</span>
               <div>
                 <div className="summary-label">Income</div>
-                <div className="summary-value">{fmtCurrency(income)}</div>
+                <div className="summary-value">{fmtCurrency(income, currency)}</div>
               </div>
             </div>
             <div className="summary-divider" />
@@ -99,7 +99,7 @@ export default function Home({ onNavigate }) {
               <span className="summary-icon">↑</span>
               <div>
                 <div className="summary-label">Expenses</div>
-                <div className="summary-value">{fmtCurrency(expenses)}</div>
+                <div className="summary-value">{fmtCurrency(expenses, currency)}</div>
               </div>
             </div>
           </div>

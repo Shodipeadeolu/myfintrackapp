@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import { getTransactions } from '../firebase/service'
-import { groupByCategory, get6MonthTrend, fmtCurrency, toFirestoreDate, getDateRange } from '../utils/helpers'
+import { groupByCategory, get6MonthTrend, fmtCurrency, toFirestoreDate } from '../utils/helpers'
 import { startOfMonth, endOfMonth, startOfYear, endOfYear, startOfWeek, endOfWeek, format } from 'date-fns'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import MonthNavigator from '../components/MonthNavigator'
@@ -13,31 +13,33 @@ const PERIOD_OPTIONS = ['Weekly', 'Monthly', 'Annually', 'Custom']
 const COLORS = ['#e8421a','#f07040','#f5a070','#fad0b8','#1a7a4a','#3aaa6a','#1a4fa8','#4a80e8','#c47b0a','#f0b030']
 
 export default function Stats() {
-  const { user, householdId, categories, reloadTrigger } = useApp()
-  const [period, setPeriod] = useState('Monthly')
-  const [anchor, setAnchor] = useState(new Date())
+  const { user, householdId, categories, reloadTrigger, currency } = useApp()
+  const [period, setPeriod]           = useState('Monthly')
+  const [anchor, setAnchor]           = useState(new Date())
   const [customStart, setCustomStart] = useState(toFirestoreDate(startOfMonth(new Date())))
-  const [customEnd, setCustomEnd] = useState(toFirestoreDate(endOfMonth(new Date())))
-  const [txType, setTxType] = useState('expense')
+  const [customEnd, setCustomEnd]     = useState(toFirestoreDate(endOfMonth(new Date())))
+  const [txType, setTxType]           = useState('expense')
   const [transactions, setTransactions] = useState([])
-  const [allTx, setAllTx] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [drillCat, setDrillCat] = useState(null)
-  const [drillTxs, setDrillTxs] = useState([])
-  const [editTx, setEditTx] = useState(null)
+  const [allTx, setAllTx]             = useState([])
+  const [loading, setLoading]         = useState(true)
+
+  // Drill state: null → category view → subcategory view → tx view
+  const [drillCat, setDrillCat]       = useState(null)  // category name
+  const [drillSub, setDrillSub]       = useState(null)  // subcategory name | '__all__'
+  const [editTx, setEditTx]           = useState(null)
 
   useEffect(() => { load() }, [period, anchor, customStart, customEnd, householdId, reloadTrigger])
 
   const getRange = () => {
     if (period === 'Custom') return { start: customStart, end: customEnd }
     if (period === 'Weekly') {
-      const s = startOfWeek(anchor, { weekStartsOn: 1 })
-      const e = endOfWeek(anchor, { weekStartsOn: 1 })
-      return { start: toFirestoreDate(s), end: toFirestoreDate(e) }
+      return {
+        start: toFirestoreDate(startOfWeek(anchor, { weekStartsOn: 1 })),
+        end:   toFirestoreDate(endOfWeek(anchor,   { weekStartsOn: 1 }))
+      }
     }
-    if (period === 'Annually') {
+    if (period === 'Annually')
       return { start: toFirestoreDate(startOfYear(anchor)), end: toFirestoreDate(endOfYear(anchor)) }
-    }
     return { start: toFirestoreDate(startOfMonth(anchor)), end: toFirestoreDate(endOfMonth(anchor)) }
   }
 
@@ -60,20 +62,46 @@ export default function Stats() {
   }
 
   const breakdown = groupByCategory(transactions, txType)
-  const trend = get6MonthTrend(allTx)
-  const total = transactions.filter(t => t.type === txType).reduce((a, t) => a + t.amount, 0)
-
-  const openDrill = (cat) => {
-    setDrillCat(cat.name)
-    setDrillTxs(transactions.filter(t => t.type === txType && t.category === cat.name))
-  }
+  const trend     = get6MonthTrend(allTx)
+  const total     = transactions.filter(t => t.type === txType).reduce((a, t) => a + t.amount, 0)
 
   const periodLabel = () => {
     if (period === 'Weekly') return `Week of ${format(startOfWeek(anchor, { weekStartsOn: 1 }), 'MMM d')}`
     if (period === 'Annually') return format(anchor, 'yyyy')
-    if (period === 'Monthly') return format(anchor, 'MMMM yyyy')
+    if (period === 'Monthly')  return format(anchor, 'MMMM yyyy')
     return `${customStart} → ${customEnd}`
   }
+
+  // Transactions for the drilled category
+  const catTxs = drillCat
+    ? transactions.filter(t => t.type === txType && t.category === drillCat)
+    : []
+
+  // Build subcategory breakdown for the drilled category
+  const subBreakdown = (() => {
+    if (!drillCat) return []
+    const map = {}
+    catTxs.forEach(t => {
+      const key = t.subcategory?.trim() || '(no subcategory)'
+      map[key] = (map[key] || 0) + t.amount
+    })
+    const subTotal = Object.values(map).reduce((a, b) => a + b, 0)
+    return Object.entries(map)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, amount]) => ({ name, amount, pct: subTotal ? Math.round((amount / subTotal) * 100) : 0 }))
+  })()
+
+  // Transactions for the drilled subcategory
+  const subTxs = drillSub
+    ? (drillSub === '__all__'
+        ? catTxs
+        : catTxs.filter(t => (t.subcategory?.trim() || '(no subcategory)') === drillSub))
+    : []
+
+  const closeDrill = () => { setDrillCat(null); setDrillSub(null) }
+  const closeSub   = () => setDrillSub(null)
+
+  const fmt = (n) => fmtCurrency(n, currency)
 
   return (
     <div className="screen">
@@ -89,7 +117,6 @@ export default function Stats() {
       </div>
 
       <div className="scroll-area">
-        {/* Period navigator */}
         <div className="stats-period-bar">
           {period === 'Custom' ? (
             <div className="custom-range">
@@ -102,15 +129,10 @@ export default function Stats() {
           )}
         </div>
 
-        {/* Income / Expense toggle */}
         <div className="type-seg-wrap">
           <div className="seg-control">
-            <button className={`seg-btn ${txType === 'expense' ? 'active' : ''}`} onClick={() => setTxType('expense')}>
-              Expenses
-            </button>
-            <button className={`seg-btn ${txType === 'income' ? 'active' : ''}`} onClick={() => setTxType('income')}>
-              Income
-            </button>
+            <button className={`seg-btn ${txType === 'expense' ? 'active' : ''}`} onClick={() => setTxType('expense')}>Expenses</button>
+            <button className={`seg-btn ${txType === 'income'  ? 'active' : ''}`} onClick={() => setTxType('income')}>Income</button>
           </div>
         </div>
 
@@ -118,24 +140,14 @@ export default function Stats() {
           <div className="load-row"><span className="spinner" /></div>
         ) : (
           <>
-            {/* Pie chart */}
             {breakdown.length > 0 && (
               <div className="stats-card">
                 <div className="stats-total-label">Total {txType === 'expense' ? 'Spent' : 'Earned'}</div>
-                <div className="stats-total">{fmtCurrency(total)}</div>
+                <div className="stats-total">{fmt(total)}</div>
                 <div className="pie-wrap">
                   <PieChart width={220} height={220}>
-                    <Pie
-                      data={breakdown}
-                      cx={110} cy={110}
-                      innerRadius={65}
-                      outerRadius={100}
-                      paddingAngle={2}
-                      dataKey="amount"
-                    >
-                      {breakdown.map((_, i) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                      ))}
+                    <Pie data={breakdown} cx={110} cy={110} innerRadius={65} outerRadius={100} paddingAngle={2} dataKey="amount">
+                      {breakdown.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                     </Pie>
                   </PieChart>
                   <div className="pie-center">
@@ -145,17 +157,16 @@ export default function Stats() {
               </div>
             )}
 
-            {/* Category breakdown */}
             {breakdown.length > 0 ? (
               <div className="stats-section">
                 <div className="stats-section-title">By Category</div>
                 {breakdown.map((cat, i) => (
-                  <button key={cat.name} className="cat-row" onClick={() => openDrill(cat)}>
+                  <button key={cat.name} className="cat-row" onClick={() => { setDrillCat(cat.name); setDrillSub(null) }}>
                     <div className="cat-row-left">
                       <div className="cat-dot" style={{ background: COLORS[i % COLORS.length] }} />
                       <div>
                         <div className="cat-row-name">{cat.name}</div>
-                        <div className="cat-row-amount">{fmtCurrency(cat.amount)}</div>
+                        <div className="cat-row-amount">{fmt(cat.amount)}</div>
                       </div>
                     </div>
                     <div className="cat-row-right">
@@ -176,7 +187,6 @@ export default function Stats() {
               </div>
             )}
 
-            {/* 6-month trend */}
             <div className="stats-section">
               <div className="stats-section-title">6-Month Trend</div>
               <div className="chart-wrap">
@@ -185,15 +195,10 @@ export default function Stats() {
                     <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
                     <YAxis hide />
                     <Tooltip
-                      formatter={(v) => fmtCurrency(v)}
-                      contentStyle={{
-                        background: 'var(--bg-card)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 10,
-                        fontSize: 12
-                      }}
+                      formatter={(v) => fmt(v)}
+                      contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12 }}
                     />
-                    <Bar dataKey="income" fill="var(--green)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="income"  fill="var(--green)"  radius={[4, 4, 0, 0]} />
                     <Bar dataKey="expense" fill="var(--accent)" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -207,25 +212,77 @@ export default function Stats() {
         )}
       </div>
 
-      {/* Drill-down sheet */}
-      {drillCat && (
+      {/* ── Level 1: Category drill-down → shows subcategories ── */}
+      {drillCat && !drillSub && (
         <>
-          <div className="sheet-overlay" onClick={() => setDrillCat(null)} />
+          <div className="sheet-overlay" onClick={closeDrill} />
           <div className="sheet">
             <div className="sheet-handle" />
             <div className="sheet-header">
-              <button className="btn btn-ghost" onClick={() => setDrillCat(null)}>✕</button>
+              <button className="btn btn-ghost" onClick={closeDrill}>✕</button>
               <span className="sheet-title">{drillCat}</span>
               <span style={{ width: 40 }} />
             </div>
             <div className="sheet-body">
               <div className="drill-total">
-                {fmtCurrency(drillTxs.reduce((a, t) => a + t.amount, 0))} · {drillTxs.length} transactions
+                {fmt(catTxs.reduce((a, t) => a + t.amount, 0))} · {catTxs.length} transactions
               </div>
-              {drillTxs.map(tx => (
+
+              {/* See all transactions shortcut */}
+              <button className="drill-all-btn" onClick={() => setDrillSub('__all__')}>
+                <span>All transactions</span>
+                <span className="drill-all-count">{catTxs.length}</span>
+              </button>
+
+              {/* Subcategory breakdown */}
+              {subBreakdown.length > 0 && (
+                <div className="drill-sub-list">
+                  <div className="drill-sub-title">By Subcategory</div>
+                  {subBreakdown.map((sub, i) => (
+                    <button key={sub.name} className="drill-sub-row" onClick={() => setDrillSub(sub.name)}>
+                      <div className="drill-sub-left">
+                        <div className="drill-sub-dot" style={{ background: COLORS[i % COLORS.length] }} />
+                        <div>
+                          <div className="drill-sub-name">{sub.name}</div>
+                          <div className="drill-sub-amt">{fmt(sub.amount)}</div>
+                        </div>
+                      </div>
+                      <div className="drill-sub-right">
+                        <div className="pct-badge" style={{ background: COLORS[i % COLORS.length] + '22', color: COLORS[i % COLORS.length] }}>
+                          {sub.pct}%
+                        </div>
+                        <span className="drill-sub-arrow">›</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Level 2: Subcategory drill-down → shows transactions ── */}
+      {drillCat && drillSub && (
+        <>
+          <div className="sheet-overlay" onClick={closeSub} />
+          <div className="sheet">
+            <div className="sheet-handle" />
+            <div className="sheet-header">
+              <button className="btn btn-ghost" onClick={closeSub}>‹ Back</button>
+              <span className="sheet-title">
+                {drillSub === '__all__' ? drillCat : drillSub}
+              </span>
+              <span style={{ width: 40 }} />
+            </div>
+            <div className="sheet-body">
+              <div className="drill-total">
+                {fmt(subTxs.reduce((a, t) => a + t.amount, 0))} · {subTxs.length} transactions
+              </div>
+              {subTxs.map(tx => (
                 <TransactionItem
                   key={tx.id} tx={tx} categories={categories}
-                  onClick={(t) => { setDrillCat(null); setEditTx(t) }}
+                  onClick={(t) => { closeDrill(); setEditTx(t) }}
                 />
               ))}
             </div>

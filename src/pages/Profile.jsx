@@ -3,19 +3,31 @@ import { useApp } from '../context/AppContext'
 import CategoryManager from '../components/CategoryManager'
 import HouseholdManager from '../components/HouseholdManager'
 import ImportSheet from '../components/ImportSheet'
+import CurrencyPicker from '../components/CurrencyPicker'
 import './Profile.css'
 
+const CURRENCY_NAMES = {
+  NGN:'Nigerian Naira', USD:'US Dollar', EUR:'Euro', GBP:'British Pound',
+  GHS:'Ghanaian Cedi', KES:'Kenyan Shilling', ZAR:'South African Rand',
+  EGP:'Egyptian Pound', AED:'UAE Dirham', CAD:'Canadian Dollar',
+  AUD:'Australian Dollar', JPY:'Japanese Yen', CNY:'Chinese Yuan',
+  INR:'Indian Rupee', BRL:'Brazilian Real', SGD:'Singapore Dollar',
+}
+
 export default function Profile({ initialTab }) {
-  const { user, profile, household, userRole, logout } = useApp()
+  const { user, profile, household, userRole, logout, currency } = useApp()
   const [activeSheet, setActiveSheet] = useState(initialTab || null)
 
   const initials = (profile?.displayName || user?.email || 'U')
     .split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
 
+  const currencyLabel = CURRENCY_NAMES[currency] || currency
+
   const menuItems = [
-    { id: 'types', icon: '⊞', label: 'Transaction Types', desc: 'Manage categories & subcategories' },
-    { id: 'household', icon: '🏠', label: 'Household', desc: household ? household.name : 'Create or join a household' },
-    { id: 'import', icon: '📥', label: 'Import Transactions', desc: 'Upload an XLSX file' },
+    { id: 'currency', icon: '💱', label: 'Currency', desc: `${currency} · ${currencyLabel}` },
+    { id: 'types',    icon: '⊞', label: 'Transaction Types', desc: 'Manage categories & subcategories' },
+    { id: 'household',icon: '🏠', label: 'Household', desc: household ? household.name : 'Create or join a household' },
+    { id: 'import',   icon: '📥', label: 'Import Transactions', desc: 'Upload an XLSX file' },
   ]
 
   return (
@@ -58,19 +70,14 @@ export default function Profile({ initialTab }) {
 
         <div className="profile-footer">
           <p>FinTrack · Built with ♥</p>
-          <p>v2.0.0</p>
+          <p>v2.1.0</p>
         </div>
       </div>
 
-      {activeSheet === 'types' && (
-        <CategoryManager onClose={() => setActiveSheet(null)} />
-      )}
-      {activeSheet === 'household' && (
-        <HouseholdManager onClose={() => setActiveSheet(null)} />
-      )}
-      {activeSheet === 'import' && (
-        <ImportSheet onClose={() => setActiveSheet(null)} />
-      )}
+      {activeSheet === 'currency'  && <CurrencyPicker onClose={() => setActiveSheet(null)} />}
+      {activeSheet === 'types'     && <CategoryManager onClose={() => setActiveSheet(null)} />}
+      {activeSheet === 'household' && <HouseholdManager onClose={() => setActiveSheet(null)} />}
+      {activeSheet === 'import'    && <ImportSheet onClose={() => setActiveSheet(null)} />}
     </div>
   )
 }

@@ -17,59 +17,60 @@ export function AppProvider({ children }) {
   const [dataLoading, setDataLoading] = useState(false)
   const [reloadTrigger, setReloadTrigger] = useState(0)
   const [theme, setTheme]             = useState(() => localStorage.getItem('ft-theme') || 'light')
+  const [currency, setCurrencyState]  = useState(() => localStorage.getItem('ft-currency') || 'USD')
   const [categories, setCategories]   = useState([])
   const [household, setHousehold]     = useState(null)
   const [pendingInvites, setPendingInvites] = useState([])
 
-  // ── Theme ────────────────────────────────────────────────────
+  // Theme
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('ft-theme', theme)
   }, [theme])
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light')
 
-  // ── Auth listener ────────────────────────────────────────────
-  // Flip authLoading immediately so the app shell renders without waiting
-  // for Firestore. Data loads in the background.
+  // Currency — persist to localStorage + Firestore profile
+  const setCurrency = async (code, uid) => {
+    setCurrencyState(code)
+    localStorage.setItem('ft-currency', code)
+    if (uid) await setUserProfile(uid, { currency: code })
+  }
+
+  // Auth
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
       setUser(u)
       if (u) {
-        loadUserData(u) // not awaited — intentional
+        loadUserData(u)
       } else {
-        setProfile(null)
-        setCategories([])
-        setHousehold(null)
-        setPendingInvites([])
+        setProfile(null); setCategories([]); setHousehold(null); setPendingInvites([])
       }
       setAuthLoading(false)
     })
   }, [])
 
-  // ── Core data loader ─────────────────────────────────────────
-  // overrideHouseholdId: pass after create/join/leave so we don't
-  // rely on the just-written Firestore doc being immediately consistent.
   const loadUserData = async (u, overrideHouseholdId) => {
     setDataLoading(true)
     try {
-      // 1. Profile — single doc read, fast
       let prof = await getUserProfile(u.uid)
       if (!prof) {
         prof = { displayName: u.displayName || '', email: u.email, createdAt: new Date().toISOString() }
         await setUserProfile(u.uid, prof)
       }
 
-      // If an override was supplied (right after household create/leave),
-      // inject it directly so we don't wait for Firestore propagation
+      // Load saved currency from profile
+      if (prof.currency) {
+        setCurrencyState(prof.currency)
+        localStorage.setItem('ft-currency', prof.currency)
+      }
+
       const hhId = overrideHouseholdId !== undefined
         ? overrideHouseholdId
         : (prof.householdId || null)
 
-      // Merge the householdId into the profile we're about to set in state
-      const mergedProf = hhId !== undefined ? { ...prof, householdId: hhId || undefined } : prof
+      const mergedProf = { ...prof, householdId: hhId || undefined }
       setProfile(mergedProf)
 
-      // 2. Parallel fetch — household + categories + invites all at once
       const [hh, cats, invites] = await Promise.all([
         hhId ? getHousehold(hhId) : Promise.resolve(null),
         getCategories(u.uid, hhId),
@@ -79,7 +80,6 @@ export function AppProvider({ children }) {
       setHousehold(hh)
       setPendingInvites(invites)
 
-      // Seed default categories for brand-new solo users
       if (cats.length === 0 && !hhId) {
         await seedDefaultCategories(u.uid)
         const fresh = await getCategories(u.uid, null)
@@ -127,6 +127,8 @@ export function AppProvider({ children }) {
       reloadTrigger,
       triggerReload: () => setReloadTrigger(n => n + 1),
       theme, toggleTheme,
+      currency,
+      setCurrency: (code) => setCurrency(code, user?.uid),
       categories, setCategories, refreshCategories,
       household, householdId, userRole, canWrite, refreshHousehold,
       pendingInvites, handleAcceptInvite,
