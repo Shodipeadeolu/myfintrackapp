@@ -1,177 +1,234 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import {
-  createHousehold, createInvite, removeMember,
-  updateMemberRole, setUserProfile, getHousehold
+  createHousehold, removeMember, updateMemberRole,
+  setUserProfile, getHousehold,
+  setHouseholdInviteCode, joinHouseholdByCode
 } from '../firebase/service'
 import { ROLES } from '../utils/helpers'
 import './HouseholdManager.css'
 
+const ROLE_LABELS = {
+  'all-access':  { label: 'All Access',    desc: 'Can do everything except manage members', icon: '⚡' },
+  'record-edit': { label: 'Record & Edit', desc: 'Add and edit transactions only',           icon: '✏️' },
+  'view-only':   { label: 'View Only',     desc: 'Can only view, cannot add or edit',        icon: '👁' },
+}
+
 export default function HouseholdManager({ onClose }) {
   const { user, profile, household, userRole, refreshHousehold, reloadUser } = useApp()
-  const [view, setView]               = useState(household ? 'manage' : 'create')
-  const [localHousehold, setLocalHousehold] = useState(household) // local copy so we don't depend on context timing
-  const [houseName, setHouseName]     = useState('')
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole]   = useState('record-edit')
-  const [loading, setLoading]         = useState(false)
-  const [msg, setMsg]                 = useState({ text: '', type: 'info' })
+  const [view, setView]                     = useState(household ? 'manage' : 'entry')
+  const [localHousehold, setLocalHousehold] = useState(household)
+  const [houseName, setHouseName]           = useState('')
+  const [joinCode, setJoinCode]             = useState('')
+  const [selectedRole, setSelectedRole]     = useState('record-edit')
+  const [loading, setLoading]               = useState(false)
+  const [msg, setMsg]                       = useState({ text: '', type: 'info' })
+  const [codeCopied, setCodeCopied]         = useState(false)
 
-  // Sync localHousehold when context household updates
   useEffect(() => {
     if (household) {
       setLocalHousehold(household)
-      if (view === 'create') setView('manage')
+      if (['entry','create','join'].includes(view)) setView('manage')
     }
   }, [household])
 
   const isOwner = userRole === 'owner'
-  const hh = localHousehold // always use localHousehold — never household directly
+  const hh = localHousehold
 
+  const refreshLocal = async (id) => {
+    const fresh = await getHousehold(id)
+    setLocalHousehold(fresh)
+    refreshHousehold()
+  }
+
+  // ── Create household ────────────────────────────────────────
   const createHH = async () => {
     if (!houseName.trim()) return
-    setLoading(true)
-    setMsg({ text: '', type: 'info' })
+    setLoading(true); setMsg({ text: '', type: 'info' })
     try {
       const id = await createHousehold(user.uid, houseName.trim())
       await setUserProfile(user.uid, { householdId: id })
-      // Fetch the household immediately into local state — don't wait for context
-      const freshHH = await getHousehold(id)
-      setLocalHousehold(freshHH)
+      await refreshLocal(id)
       setView('manage')
-      // Reload context in background
       reloadUser(id)
     } catch (e) {
-      console.error('createHH error', e)
-      setMsg({ text: 'Failed to create household: ' + (e?.message || 'Try again.'), type: 'error' })
-    } finally {
-      setLoading(false)
-    }
+      setMsg({ text: 'Failed: ' + (e?.message || 'Try again.'), type: 'error' })
+    } finally { setLoading(false) }
   }
 
-  const sendInvite = async () => {
-    if (!inviteEmail.trim()) return
-    if (!hh?.id) {
-      setMsg({ text: 'Household not ready yet. Please wait a moment and try again.', type: 'error' })
-      return
-    }
-    setLoading(true)
-    setMsg({ text: '', type: 'info' })
+  // ── Join by code ────────────────────────────────────────────
+  const joinByCode = async () => {
+    if (joinCode.trim().length < 6) return
+    setLoading(true); setMsg({ text: '', type: 'info' })
     try {
-      await createInvite(
-        hh.id, hh.name,
-        profile?.displayName || user.email,
-        inviteEmail.trim().toLowerCase(),
-        inviteRole
-      )
-      setMsg({ text: `✅ Invite sent to ${inviteEmail}`, type: 'success' })
-      setInviteEmail('')
+      const joined = await joinHouseholdByCode(joinCode.trim(), user.uid)
+      await setUserProfile(user.uid, { householdId: joined.id })
+      await refreshLocal(joined.id)
+      setView('manage')
+      reloadUser(joined.id)
     } catch (e) {
-      console.error('sendInvite error', e)
-      setMsg({ text: 'Failed to send invite: ' + (e?.message || 'Try again.'), type: 'error' })
-    } finally {
-      setLoading(false)
-    }
+      setMsg({ text: e?.message || 'Invalid code. Try again.', type: 'error' })
+    } finally { setLoading(false) }
+  }
+
+  // ── Generate new code with selected role ────────────────────
+  const generateCode = async () => {
+    if (!hh?.id) return
+    setLoading(true)
+    try {
+      await setHouseholdInviteCode(hh.id, selectedRole)
+      await refreshLocal(hh.id)
+    } catch (e) {
+      setMsg({ text: 'Failed to generate code.', type: 'error' })
+    } finally { setLoading(false) }
+  }
+
+  // ── Copy code ───────────────────────────────────────────────
+  const copyCode = () => {
+    const text = hh?.inviteCode
+      ? `Join my household "${hh.name}" on FinTrack! Use code: ${hh.inviteCode}`
+      : ''
+    navigator.clipboard?.writeText(text).catch(() => {})
+    setCodeCopied(true)
+    setTimeout(() => setCodeCopied(false), 2000)
   }
 
   const kickMember = async (memberId) => {
     if (!window.confirm('Remove this member?')) return
     try {
       await removeMember(hh.id, memberId)
-      const fresh = await getHousehold(hh.id)
-      setLocalHousehold(fresh)
-      refreshHousehold()
-    } catch (e) {
-      setMsg({ text: 'Failed to remove member.', type: 'error' })
-    }
+      await refreshLocal(hh.id)
+    } catch { setMsg({ text: 'Failed to remove member.', type: 'error' }) }
   }
 
   const changeRole = async (memberId, role) => {
     try {
       await updateMemberRole(hh.id, memberId, role)
-      const fresh = await getHousehold(hh.id)
-      setLocalHousehold(fresh)
-      refreshHousehold()
-    } catch (e) {
-      setMsg({ text: 'Failed to update role.', type: 'error' })
-    }
+      await refreshLocal(hh.id)
+    } catch { setMsg({ text: 'Failed to update role.', type: 'error' }) }
   }
 
   const leaveHH = async () => {
-    if (!window.confirm("Leave this household? Your data will remain but you'll lose shared access.")) return
+    if (!window.confirm("Leave this household?")) return
     try {
       await removeMember(hh.id, user.uid)
       await setUserProfile(user.uid, { householdId: null })
       await reloadUser(null)
       onClose()
-    } catch (e) {
-      setMsg({ text: 'Failed to leave household.', type: 'error' })
-    }
+    } catch { setMsg({ text: 'Failed to leave.', type: 'error' }) }
   }
 
-  // ── Create view ───────────────────────────────────────────
-  if (view === 'create') {
-    return (
-      <>
-        <div className="sheet-overlay" onClick={onClose} />
-        <div className="sheet">
-          <div className="sheet-handle" />
-          <div className="sheet-header">
-            <button className="btn btn-ghost" onClick={onClose}>✕</button>
-            <span className="sheet-title">Create Household</span>
-            <span style={{ width: 40 }} />
-          </div>
-          <div className="sheet-body">
-            <div className="hh-intro">
-              <div className="hh-big-icon">🏠</div>
-              <p>Create a household to share transactions and budgets with family or housemates.</p>
-            </div>
-            <div className="field">
-              <label>Household Name</label>
-              <input
-                value={houseName}
-                onChange={e => setHouseName(e.target.value)}
-                placeholder="e.g. The Shodipe Family"
-                autoFocus
-                onKeyDown={e => e.key === 'Enter' && createHH()}
-              />
-            </div>
-            {msg.text && <p className={msg.type === 'error' ? 'form-err' : 'hh-msg'}>{msg.text}</p>}
-            <button
-              className="btn btn-primary btn-full"
-              onClick={createHH}
-              disabled={loading || !houseName.trim()}
-            >
-              {loading ? <span className="spinner" /> : 'Create Household'}
+  // ── Entry ───────────────────────────────────────────────────
+  if (view === 'entry') return (
+    <>
+      <div className="sheet-overlay" onClick={onClose} />
+      <div className="sheet">
+        <div className="sheet-handle" />
+        <div className="sheet-header">
+          <button className="btn btn-ghost" onClick={onClose}>✕</button>
+          <span className="sheet-title">Household</span>
+          <span style={{ width: 40 }} />
+        </div>
+        <div className="sheet-body">
+          <div className="hh-entry-options">
+            <button className="hh-option-card" onClick={() => setView('create')}>
+              <div className="hh-option-icon">🏠</div>
+              <div className="hh-option-label">Create a Household</div>
+              <div className="hh-option-desc">Start a new household and invite your family</div>
+            </button>
+            <button className="hh-option-card" onClick={() => setView('join')}>
+              <div className="hh-option-icon">🔑</div>
+              <div className="hh-option-label">Join with a Code</div>
+              <div className="hh-option-desc">Enter a 6-character code from your household owner</div>
             </button>
           </div>
         </div>
-      </>
-    )
-  }
+      </div>
+    </>
+  )
 
-  // ── Manage view — loading guard ────────────────────────────
-  if (!hh) {
-    return (
-      <>
-        <div className="sheet-overlay" onClick={onClose} />
-        <div className="sheet">
-          <div className="sheet-handle" />
-          <div className="sheet-header">
-            <button className="btn btn-ghost" onClick={onClose}>✕</button>
-            <span className="sheet-title">Household</span>
-            <span style={{ width: 40 }} />
-          </div>
-          <div className="sheet-body">
-            <div className="load-row"><span className="spinner" /></div>
-          </div>
+  // ── Create ──────────────────────────────────────────────────
+  if (view === 'create') return (
+    <>
+      <div className="sheet-overlay" onClick={onClose} />
+      <div className="sheet">
+        <div className="sheet-handle" />
+        <div className="sheet-header">
+          <button className="btn btn-ghost" onClick={() => setView('entry')}>‹ Back</button>
+          <span className="sheet-title">Create Household</span>
+          <span style={{ width: 40 }} />
         </div>
-      </>
-    )
-  }
+        <div className="sheet-body">
+          <div className="hh-intro">
+            <div className="hh-big-icon">🏠</div>
+            <p>Create a household to share finances with family or housemates.</p>
+          </div>
+          <div className="field">
+            <label>Household Name</label>
+            <input value={houseName} onChange={e => setHouseName(e.target.value)}
+              placeholder="e.g. The Shodipe Family" autoFocus
+              onKeyDown={e => e.key === 'Enter' && createHH()} />
+          </div>
+          {msg.text && <p className={msg.type === 'error' ? 'form-err' : 'hh-msg'}>{msg.text}</p>}
+          <button className="btn btn-primary btn-full" onClick={createHH} disabled={loading || !houseName.trim()}>
+            {loading ? <span className="spinner" /> : 'Create Household'}
+          </button>
+        </div>
+      </div>
+    </>
+  )
 
-  // ── Manage view ────────────────────────────────────────────
+  // ── Join ────────────────────────────────────────────────────
+  if (view === 'join') return (
+    <>
+      <div className="sheet-overlay" onClick={onClose} />
+      <div className="sheet">
+        <div className="sheet-handle" />
+        <div className="sheet-header">
+          <button className="btn btn-ghost" onClick={() => setView('entry')}>‹ Back</button>
+          <span className="sheet-title">Join a Household</span>
+          <span style={{ width: 40 }} />
+        </div>
+        <div className="sheet-body">
+          <div className="hh-intro">
+            <div className="hh-big-icon">🔑</div>
+            <p>Enter the 6-character code from your household owner.</p>
+          </div>
+          <div className="field">
+            <label>Invite Code</label>
+            <input value={joinCode}
+              onChange={e => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6))}
+              placeholder="e.g. UDACBM" className="code-input" autoFocus
+              onKeyDown={e => e.key === 'Enter' && joinByCode()} />
+          </div>
+          {msg.text && <p className={msg.type === 'error' ? 'form-err' : 'hh-msg'}>{msg.text}</p>}
+          <button className="btn btn-primary btn-full" onClick={joinByCode} disabled={loading || joinCode.length < 6}>
+            {loading ? <span className="spinner" /> : 'Join Household'}
+          </button>
+        </div>
+      </div>
+    </>
+  )
+
+  // ── Loading guard ───────────────────────────────────────────
+  if (!hh) return (
+    <>
+      <div className="sheet-overlay" onClick={onClose} />
+      <div className="sheet">
+        <div className="sheet-handle" />
+        <div className="sheet-header">
+          <button className="btn btn-ghost" onClick={onClose}>✕</button>
+          <span className="sheet-title">Household</span>
+          <span style={{ width: 40 }} />
+        </div>
+        <div className="sheet-body"><div className="load-row"><span className="spinner" /></div></div>
+      </div>
+    </>
+  )
+
+  // ── Manage ──────────────────────────────────────────────────
   const members = hh.members || []
+  const currentCodeRole = hh.inviteCodeRole || 'record-edit'
 
   return (
     <>
@@ -184,7 +241,74 @@ export default function HouseholdManager({ onClose }) {
           <span style={{ width: 40 }} />
         </div>
         <div className="sheet-body">
-          <div className="hh-section-title">Members ({members.length})</div>
+
+          {/* ── Invite code card (owner only) ────────────────── */}
+          {isOwner && (
+            <div className="invite-code-card">
+              <div className="invite-code-label">Invite Code</div>
+
+              {hh.inviteCode ? (
+                <>
+                  <div className="invite-code-display">
+                    {hh.inviteCode.split('').map((ch, i) => (
+                      <span key={i} className="code-char">{ch}</span>
+                    ))}
+                  </div>
+                  <div className="code-role-tag">
+                    {ROLE_LABELS[currentCodeRole]?.icon} {ROLE_LABELS[currentCodeRole]?.label}
+                    <span className="code-role-desc"> · {ROLE_LABELS[currentCodeRole]?.desc}</span>
+                  </div>
+                  <p className="invite-code-hint">
+                    Share this code — anyone who uses it joins as <strong>{ROLE_LABELS[currentCodeRole]?.label}</strong>
+                  </p>
+                  <div className="invite-code-actions">
+                    <button className="btn btn-primary" style={{ flex: 1 }} onClick={copyCode}>
+                      {codeCopied ? '✓ Copied!' : '📋 Copy Code'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className="invite-code-hint" style={{ marginTop: 4 }}>
+                  Generate a code to invite members
+                </p>
+              )}
+
+              {/* Role selector + generate */}
+              <div className="code-gen-section">
+                <div className="code-gen-label">
+                  {hh.inviteCode ? 'Generate new code with role:' : 'Select role for new code:'}
+                </div>
+                <div className="role-picker">
+                  {ROLES.map(r => (
+                    <button
+                      key={r.value}
+                      className={`role-chip ${selectedRole === r.value ? 'active' : ''}`}
+                      onClick={() => setSelectedRole(r.value)}
+                    >
+                      {ROLE_LABELS[r.value]?.icon} {r.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="role-chip-desc">{ROLE_LABELS[selectedRole]?.desc}</div>
+                <button
+                  className="btn btn-secondary btn-full"
+                  onClick={generateCode}
+                  disabled={loading}
+                  style={{ marginTop: 10 }}
+                >
+                  {loading
+                    ? <span className="spinner" style={{ width: 14, height: 14 }} />
+                    : hh.inviteCode ? '↻ Generate New Code' : '+ Generate Invite Code'
+                  }
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Members list ─────────────────────────────────── */}
+          <div className="hh-section-title" style={{ marginTop: 20 }}>
+            Members ({members.length})
+          </div>
           {members.map(m => (
             <div key={m.userId} className="member-row">
               <div className="member-avatar">
@@ -199,15 +323,11 @@ export default function HouseholdManager({ onClose }) {
                     ? (profile?.displayName || 'You')
                     : (m.email || m.userId.slice(0, 16) + '…')}
                 </div>
-                <div className="member-role-tag">{m.role}</div>
+                <div className="member-role-tag">{ROLE_LABELS[m.role]?.label || m.role}</div>
               </div>
               {isOwner && m.userId !== user.uid && (
                 <div className="member-actions">
-                  <select
-                    value={m.role}
-                    onChange={e => changeRole(m.userId, e.target.value)}
-                    className="role-select"
-                  >
+                  <select value={m.role} onChange={e => changeRole(m.userId, e.target.value)} className="role-select">
                     {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                   </select>
                   <button className="btn btn-ghost" onClick={() => kickMember(m.userId)}>🗑</button>
@@ -216,38 +336,10 @@ export default function HouseholdManager({ onClose }) {
             </div>
           ))}
 
-          {isOwner && (
-            <>
-              <div className="hh-section-title" style={{ marginTop: 20 }}>Invite Member</div>
-              <div className="field">
-                <label>Email Address</label>
-                <input
-                  type="email"
-                  value={inviteEmail}
-                  onChange={e => setInviteEmail(e.target.value)}
-                  placeholder="friend@email.com"
-                  onKeyDown={e => e.key === 'Enter' && sendInvite()}
-                />
-              </div>
-              <div className="field">
-                <label>Permission Level</label>
-                <select value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
-                  {ROLES.map(r => (
-                    <option key={r.value} value={r.value}>{r.label} — {r.desc}</option>
-                  ))}
-                </select>
-              </div>
-              {msg.text && (
-                <p className={msg.type === 'error' ? 'form-err' : 'hh-msg'}>{msg.text}</p>
-              )}
-              <button
-                className="btn btn-primary btn-full"
-                onClick={sendInvite}
-                disabled={loading || !inviteEmail.trim()}
-              >
-                {loading ? <span className="spinner" /> : 'Send Invite'}
-              </button>
-            </>
+          {msg.text && (
+            <p className={msg.type === 'error' ? 'form-err' : 'hh-msg'} style={{ marginTop: 12 }}>
+              {msg.text}
+            </p>
           )}
 
           {!isOwner && (

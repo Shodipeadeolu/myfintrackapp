@@ -5,6 +5,14 @@ import {
 } from 'firebase/firestore'
 import { db } from './config'
 
+// ─── Helpers ─────────────────────────────────────────────────
+const _genCode = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let code = ''
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)]
+  return code
+}
+
 // ─── Transactions ────────────────────────────────────────────
 export const getTransactions = async (userId, householdId, startDate, endDate) => {
   const uid = householdId || userId
@@ -115,9 +123,11 @@ export const getHousehold = async (householdId) => {
 
 export const createHousehold = async (userId, name) => {
   const ref = doc(collection(db, 'households'))
+  const code = _genCode()
   await setDoc(ref, {
     name,
     ownerId: userId,
+    inviteCode: code,
     members: [{ userId, role: 'owner', joinedAt: new Date().toISOString() }],
     createdAt: serverTimestamp()
   })
@@ -189,4 +199,43 @@ export const getUserProfile = async (userId) => {
 
 export const setUserProfile = async (userId, data) => {
   return setDoc(doc(db, 'users', userId), data, { merge: true })
+}
+
+// ─── Invite Codes ─────────────────────────────────────────────
+export const generateInviteCode = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no O,0,I,1 to avoid confusion
+  let code = ''
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)]
+  return code
+}
+
+export const setHouseholdInviteCode = async (householdId, role = 'record-edit') => {
+  const code = generateInviteCode()
+  await updateDoc(doc(db, 'households', householdId), { inviteCode: code, inviteCodeRole: role })
+  return code
+}
+
+export const getHouseholdByCode = async (code) => {
+  const snap = await getDocs(query(
+    collection(db, 'households'),
+    where('inviteCode', '==', code.toUpperCase().trim())
+  ))
+  if (snap.empty) return null
+  const d = snap.docs[0]
+  return { id: d.id, ...d.data() }
+}
+
+export const joinHouseholdByCode = async (code, userId) => {
+  const hh = await getHouseholdByCode(code)
+  if (!hh) throw new Error('Invalid code. Check and try again.')
+  if (hh.members?.some(m => m.userId === userId))
+    throw new Error('You are already a member of this household.')
+  const role = hh.inviteCodeRole || 'record-edit'
+  const members = [...(hh.members || []), {
+    userId,
+    role,
+    joinedAt: new Date().toISOString()
+  }]
+  await updateDoc(doc(db, 'households', hh.id), { members })
+  return hh
 }
