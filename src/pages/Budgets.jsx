@@ -8,13 +8,15 @@ import MonthNavigator from '../components/MonthNavigator'
 import CategoryPicker from '../components/CategoryPicker'
 import './Budgets.css'
 
+const DOT_COLORS = ['#7c3aed','#e8421a','#00c48c','#4a80e8','#f5a623','#ef4444','#06b6d4','#ec4899']
+
 export default function Budgets() {
   const { user, householdId, categories, canWrite, reloadTrigger, currency } = useApp()
-  const [month, setMonth]     = useState(new Date())
-  const [budgets, setBudgets] = useState([])
+  const [month, setMonth]       = useState(new Date())
+  const [budgets, setBudgets]   = useState([])
   const [spending, setSpending] = useState({})
-  const [loading, setLoading] = useState(true)
-  const [showAdd, setShowAdd] = useState(false)
+  const [loading, setLoading]   = useState(true)
+  const [showAdd, setShowAdd]   = useState(false)
   const [editBudget, setEditBudget] = useState(null)
 
   useEffect(() => { load() }, [month, householdId, reloadTrigger])
@@ -31,26 +33,22 @@ export default function Budgets() {
       ])
       setBudgets(buds)
       const map = {}
-      txs.filter(t => t.type === 'expense').forEach(t => {
-        map[t.category] = (map[t.category] || 0) + t.amount
-      })
+      txs.filter(t => t.type === 'expense').forEach(t => { map[t.category] = (map[t.category]||0) + t.amount })
       setSpending(map)
     } finally { setLoading(false) }
   }
 
-  const fmt = (n) => fmtCurrency(n, currency)
-
+  const fmt = n => fmtCurrency(n, currency)
   const totalBudgeted = budgets.reduce((a, b) => a + b.amount, 0)
-  const totalSpent    = budgets.reduce((a, b) => a + (spending[b.category] || 0), 0)
+  const totalSpent    = budgets.reduce((a, b) => a + (spending[b.category]||0), 0)
   const totalLeft     = totalBudgeted - totalSpent
-  const overallPct    = totalBudgeted > 0 ? Math.min((totalSpent / totalBudgeted) * 100, 100) : 0
+  const overallPct    = totalBudgeted > 0 ? Math.min((totalSpent/totalBudgeted)*100, 100) : 0
 
   const sorted = [...budgets].sort((a, b) => {
-    const aSpent = spending[a.category] || 0
-    const bSpent = spending[b.category] || 0
-    const aOver = aSpent > a.amount, bOver = bSpent > b.amount
-    if (aOver !== bOver) return aOver ? -1 : 1
-    return (bSpent / b.amount) - (aSpent / a.amount)
+    const aS = spending[a.category]||0, bS = spending[b.category]||0
+    const aO = aS > a.amount, bO = bS > b.amount
+    if (aO !== bO) return aO ? -1 : 1
+    return (bS/b.amount) - (aS/a.amount)
   })
 
   const handleSaved = () => { setShowAdd(false); setEditBudget(null); load() }
@@ -58,16 +56,17 @@ export default function Budgets() {
   return (
     <div className="screen">
       <div className="budgets-header">
-        <h2 className="page-title">Budgets</h2>
+        <h2 className="page-title">Budget Overview</h2>
         <MonthNavigator date={month} onChange={setMonth} />
       </div>
+      <div className="budgets-subtitle">Track and manage your monthly budgets</div>
 
       <div className="scroll-area">
         {loading ? (
           <div className="load-row"><span className="spinner" /></div>
         ) : (
           <>
-            {/* Summary card */}
+            {/* Purple summary card */}
             {budgets.length > 0 && (
               <div className="budget-summary-card">
                 <div className="bsc-title">Total Monthly Budget</div>
@@ -79,84 +78,66 @@ export default function Budgets() {
                   <div className="bsc-fill" style={{ width: `${overallPct}%` }} />
                 </div>
                 <div className="bsc-footer">
-                  <span className="bsc-pct">Overall Progress</span>
-                  <span className="bsc-remaining">{Math.round(overallPct)}%</span>
+                  <span className="bsc-progress-label">Overall Progress</span>
+                  <span className="bsc-pct">{Math.round(overallPct)}%</span>
                 </div>
               </div>
             )}
 
-            {/* Budget cards */}
+            {/* Create new budget button */}
+            {canWrite && (
+              <button className="budget-create-btn" onClick={() => setShowAdd(true)}>
+                <span style={{ fontSize: 18 }}>＋</span> Create New Budget
+              </button>
+            )}
+
+            {/* 2-column grid */}
             {sorted.length === 0 ? (
-              <div className="empty-state" style={{ marginTop: 60 }}>
+              <div className="empty-state" style={{ marginTop: 40 }}>
                 <span className="icon">🎯</span>
                 <p>No budgets yet.<br />Tap + to set a spending limit.</p>
               </div>
             ) : (
-              <div className="budget-list">
-                {sorted.map(budget => {
-                  const spent     = spending[budget.category] || 0
-                  const rawPct    = budget.amount > 0 ? (spent / budget.amount) * 100 : 0
+              <div className="budget-grid">
+                {sorted.map((budget, idx) => {
+                  const spent     = spending[budget.category]||0
+                  const rawPct    = budget.amount > 0 ? (spent/budget.amount)*100 : 0
                   const pct       = Math.min(rawPct, 100)
                   const over      = spent > budget.amount
                   const remaining = budget.amount - spent
-                  const cat       = categories.find(c => c.name === budget.category)
-                  const icon      = cat?.icon || '📦'
                   const status    = over ? 'danger' : rawPct >= 80 ? 'warn' : 'good'
+                  const dotColor  = DOT_COLORS[idx % DOT_COLORS.length]
 
                   return (
-                    <button
-                      key={budget.id}
-                      className="budget-card"
-                      onClick={() => canWrite && setEditBudget(budget)}
-                    >
-                      <div className="bc-top">
-                        <div className="bc-left">
-                          <span className="bc-icon">{icon}</span>
-                          <div>
-                            <div className="bc-name">{budget.category}</div>
-                            {budget.note && <div className="bc-note">{budget.note}</div>}
-                          </div>
+                    <button key={budget.id} className="budget-card" onClick={() => canWrite && setEditBudget(budget)}>
+                      <div className="bc-card-header">
+                        <div>
+                          <div className="bc-card-name">{budget.category}</div>
+                          <div className="bc-card-amounts">{fmt(spent)} of {fmt(budget.amount)}</div>
                         </div>
-                        <div className="bc-right">
-                          <div className={`bc-spent ${over ? 'over' : ''}`}>{fmt(spent)}</div>
-                          <div className="bc-limit">of {fmt(budget.amount)}</div>
-                        </div>
+                        <div className="bc-color-dot" style={{ background: dotColor }} />
                       </div>
 
                       <div className="bc-track">
-                        <div className={`bc-fill ${status}`} style={{ width: `${pct}%` }} />
+                        <div className={`bc-fill ${status}`} style={{ width: `${pct}%`, background: dotColor, opacity: over ? 1 : 0.85 }} />
                       </div>
 
-                      <div className="bc-bottom">
-                        <span className={`bc-badge ${status}`}>
-                          {over
-                            ? `↘ Over by ${fmt(Math.abs(remaining))}`
-                            : rawPct >= 80
-                              ? `⚠ ${fmt(remaining)} left`
-                              : `↗ ${fmt(remaining)} left`
-                          }
+                      <div className="bc-card-footer">
+                        <span className={`bc-status ${status}`}>
+                          {over ? '↘' : '↗'} {over ? `Over by ${fmt(Math.abs(remaining))}` : `${fmt(remaining)} left`}
                         </span>
-                        <span className="bc-pct">{Math.round(rawPct)}%</span>
+                        <span className="bc-card-pct">{Math.round(rawPct)}%</span>
                       </div>
 
-                      {/* Warning message */}
                       {rawPct >= 80 && !over && (
-                        <div className="bc-warning warn">⚠ Approaching budget limit</div>
+                        <div className="bc-warning-msg warn">⚠ Approaching budget limit</div>
                       )}
                       {over && (
-                        <div className="bc-warning danger">⚠ Budget exceeded — consider adjusting spending</div>
+                        <div className="bc-warning-msg danger">⊘ Budget exceeded — consider adjusting spending</div>
                       )}
                     </button>
                   )
                 })}
-              </div>
-            )}
-
-            {canWrite && (
-              <div className="budget-add-wrap">
-                <button className="budget-add-btn" onClick={() => setShowAdd(true)}>
-                  + Add Budget
-                </button>
               </div>
             )}
           </>
@@ -169,11 +150,8 @@ export default function Budgets() {
           categories={categories.filter(c => c.type === 'expense')}
           existingCategories={budgets.map(b => b.category)}
           onClose={() => { setShowAdd(false); setEditBudget(null) }}
-          onSaved={handleSaved}
-          onDeleted={handleSaved}
-          user={user}
-          householdId={householdId}
-          currency={currency}
+          onSaved={handleSaved} onDeleted={handleSaved}
+          user={user} householdId={householdId} currency={currency}
         />
       )}
     </div>
@@ -182,20 +160,17 @@ export default function Budgets() {
 
 function BudgetSheet({ budget, categories, existingCategories, onClose, onSaved, onDeleted, user, householdId, currency }) {
   const editing = !!budget
-  const [category, setCategory] = useState(budget?.category || '')
+  const [category, setCategory] = useState(budget?.category||'')
   const [amount, setAmount]     = useState(budget?.amount ? String(budget.amount) : '')
-  const [note, setNote]         = useState(budget?.note || '')
+  const [note, setNote]         = useState(budget?.note||'')
   const [saving, setSaving]     = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [err, setErr]           = useState('')
   const [showCatPicker, setShowCatPicker] = useState(false)
 
-  const availableCats = categories.filter(
-    c => !existingCategories.includes(c.name) || c.name === budget?.category
-  )
-  const selectedCat = categories.find(c => c.name === category)
-  const sym = new Intl.NumberFormat('en', { style: 'currency', currency: currency || 'USD' })
-    .format(0).replace(/[\d.,\s]/g, '').trim() || '$'
+  const availableCats = categories.filter(c => !existingCategories.includes(c.name) || c.name === budget?.category)
+  const selectedCat   = categories.find(c => c.name === category)
+  const sym = new Intl.NumberFormat('en', { style: 'currency', currency: currency||'USD' }).format(0).replace(/[\d.,\s]/g,'').trim() || '$'
 
   const handleSave = async () => {
     if (!category) return setErr('Select a category')
@@ -206,7 +181,7 @@ function BudgetSheet({ budget, categories, existingCategories, onClose, onSaved,
       const data = { category, amount: amt, note: note.trim() }
       editing ? await updateBudget(budget.id, data) : await addBudget(user.uid, householdId, data)
       onSaved()
-    } catch { setErr('Save failed. Try again.') } finally { setSaving(false) }
+    } catch { setErr('Save failed.') } finally { setSaving(false) }
   }
 
   const handleDelete = async () => {
@@ -225,9 +200,7 @@ function BudgetSheet({ budget, categories, existingCategories, onClose, onSaved,
           <button className="btn btn-ghost" onClick={onClose}>✕</button>
           <span className="sheet-title">{editing ? 'Edit Budget' : 'New Budget'}</span>
           {editing
-            ? <button className="btn btn-ghost danger-ghost" onClick={handleDelete} disabled={deleting}>
-                {deleting ? '…' : '🗑'}
-              </button>
+            ? <button className="btn btn-ghost danger-ghost" onClick={handleDelete} disabled={deleting}>{deleting ? '…' : '🗑'}</button>
             : <span style={{ width: 40 }} />
           }
         </div>
@@ -243,15 +216,12 @@ function BudgetSheet({ budget, categories, existingCategories, onClose, onSaved,
             <label>Monthly Limit</label>
             <div className="amount-field">
               <span className="currency-sym">{sym}</span>
-              <input type="number" inputMode="decimal" placeholder="0.00"
-                value={amount} onChange={e => setAmount(e.target.value)}
-                className="amount-input" autoFocus={!editing} />
+              <input type="number" inputMode="decimal" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} className="amount-input" autoFocus={!editing} />
             </div>
           </div>
           <div className="field">
             <label>Note (optional)</label>
-            <input type="text" placeholder="e.g. Groceries only"
-              value={note} onChange={e => setNote(e.target.value)} />
+            <input type="text" placeholder="e.g. Groceries only" value={note} onChange={e => setNote(e.target.value)} />
           </div>
           {err && <p className="form-err">{err}</p>}
           <button className="btn btn-primary btn-full save-btn" onClick={handleSave} disabled={saving}>
@@ -260,11 +230,9 @@ function BudgetSheet({ budget, categories, existingCategories, onClose, onSaved,
         </div>
       </div>
       {showCatPicker && (
-        <CategoryPicker
-          categories={availableCats} selected={category}
+        <CategoryPicker categories={availableCats} selected={category}
           onSelect={c => { setCategory(c.name); setShowCatPicker(false) }}
-          onClose={() => setShowCatPicker(false)} title="Pick Category"
-        />
+          onClose={() => setShowCatPicker(false)} title="Pick Category" />
       )}
     </>
   )

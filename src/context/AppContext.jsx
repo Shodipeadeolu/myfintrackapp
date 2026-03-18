@@ -16,7 +16,7 @@ export function AppProvider({ children }) {
   const [authLoading, setAuthLoading] = useState(true)
   const [dataLoading, setDataLoading] = useState(false)
   const [reloadTrigger, setReloadTrigger] = useState(0)
-  const [theme, setTheme]             = useState(() => localStorage.getItem('ft-theme') || 'light')
+  const [theme, setTheme]             = useState(() => localStorage.getItem('ft-theme') || 'dark')
   const [currency, setCurrencyState]  = useState(() => localStorage.getItem('ft-currency') || 'USD')
   const [categories, setCategories]   = useState([])
   const [household, setHousehold]     = useState(null)

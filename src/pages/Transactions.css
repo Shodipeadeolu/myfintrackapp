@@ -1,82 +1,66 @@
 .txns-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px 10px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 20px 12px; flex-shrink: 0;
+}
+
+.txns-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 0 20px 12px;
   flex-shrink: 0;
 }
 
-.page-title { font-size: 22px; font-weight: 800; }
-
-/* Summary strip */
+/* 3 summary cards */
 .txns-summary {
   display: flex;
-  align-items: center;
-  margin: 0 20px 12px;
-  background: var(--bg-card);
-  border-radius: var(--radius-md);
-  padding: 14px 16px;
-  box-shadow: var(--shadow-sm);
+  gap: 10px;
+  padding: 0 20px 14px;
   flex-shrink: 0;
 }
 
-.txns-stat { flex: 1; text-align: center; }
-
-.txns-stat-label {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 4px;
+.txns-stat-card {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 12px;
+  min-width: 0;
 }
 
-.txns-stat-value {
-  font-size: clamp(11px, 3vw, 14px);
+.txns-stat-card.income-bg  { border-color: rgba(0,196,140,0.3);  background: var(--green-dim); }
+.txns-stat-card.expense-bg { border-color: rgba(239,68,68,0.3);  background: var(--red-light); }
+
+.txns-stat-label {
+  font-size: 11px; font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.txns-stat-val {
+  font-size: clamp(12px, 3.5vw, 16px);
   font-weight: 800;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.txns-stat-value.neutral { color: var(--text-primary); }
-.txns-stat-value.income  { color: var(--green); }
-.txns-stat-value.expense { color: var(--accent); }
-
-.txns-stat-divider {
-  width: 1px; height: 32px;
-  background: var(--border);
-  margin: 0 8px;
-  flex-shrink: 0;
-}
+.txns-stat-val.neutral { color: var(--text-primary); font-size: clamp(18px, 5vw, 24px); }
+.txns-stat-val.income  { color: var(--green); }
+.txns-stat-val.expense { color: var(--red); }
 
 /* Filters */
-.txns-filters {
-  padding: 0 20px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex-shrink: 0;
-}
+.txns-filters { padding: 0 20px 12px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
 
-.search-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
+.search-row { display: flex; gap: 8px; align-items: center; }
 
 .search-box {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--bg-elevated);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
+  flex: 1; display: flex; align-items: center; gap: 8px;
+  background: var(--bg-elevated); border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 12px;
   transition: border-color var(--transition);
 }
-
 .search-box:focus-within { border-color: var(--accent); }
 .search-icon { font-size: 14px; }
 .search-box input { flex: 1; background: transparent; font-size: 14px; color: var(--text-primary); }
@@ -88,21 +72,21 @@
   background: var(--bg-elevated);
   border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  flex-shrink: 0;
+  font-size: 12px; font-weight: 700;
+  color: var(--text-secondary); white-space: nowrap; flex-shrink: 0;
   transition: all var(--transition);
 }
 .export-btn:active { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
 
-/* Date groups */
-.date-group { padding: 0 20px; margin-bottom: 8px; }
-.date-label {
-  font-size: 12px; font-weight: 700; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: 0.06em;
-  margin-bottom: 8px; margin-top: 4px;
+/* List header */
+.txns-list-header {
+  padding: 0 20px 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  flex-shrink: 0;
 }
 
-.load-row { display: flex; justify-content: center; padding: 48px; }
+/* Date groups */
+.date-group { padding: 0 20px; margin-bottom: 4px; }
+.date-label { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; margin-top: 8px; }

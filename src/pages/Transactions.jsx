@@ -10,25 +10,24 @@ import './Transactions.css'
 
 export default function Transactions() {
   const { user, householdId, categories, reloadTrigger, currency } = useApp()
-  const [month, setMonth]           = useState(new Date())
+  const [month, setMonth]             = useState(new Date())
   const [transactions, setTransactions] = useState([])
-  const [loading, setLoading]       = useState(true)
-  const [filter, setFilter]         = useState('all')
-  const [search, setSearch]         = useState('')
-  const [editTx, setEditTx]         = useState(null)
+  const [loading, setLoading]         = useState(true)
+  const [filter, setFilter]           = useState('all')
+  const [search, setSearch]           = useState('')
+  const [editTx, setEditTx]           = useState(null)
 
   useEffect(() => { load() }, [month, householdId, reloadTrigger])
 
   const load = async () => {
     setLoading(true)
     try {
-      const start = toFirestoreDate(startOfMonth(month))
-      const end   = toFirestoreDate(endOfMonth(month))
-      const txs   = await getTransactions(user.uid, householdId, start, end)
+      const txs = await getTransactions(user.uid, householdId,
+        toFirestoreDate(startOfMonth(month)),
+        toFirestoreDate(endOfMonth(month))
+      )
       setTransactions(txs)
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
   const filtered = transactions
@@ -36,22 +35,19 @@ export default function Transactions() {
     .filter(t => !search || [t.category, t.subcategory, t.note]
       .some(f => f?.toLowerCase().includes(search.toLowerCase())))
 
-  const totalIncome   = transactions.filter(t => t.type === 'income').reduce((a, t) => a + t.amount, 0)
+  const totalIncome   = transactions.filter(t => t.type === 'income').reduce((a, t)  => a + t.amount, 0)
   const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((a, t) => a + t.amount, 0)
+  const fmt = n => fmtCurrency(n, currency)
 
-  const grouped = filtered.reduce((acc, tx) => {
-    if (!acc[tx.date]) acc[tx.date] = []
-    acc[tx.date].push(tx)
-    return acc
-  }, {})
+  const grouped    = filtered.reduce((acc, tx) => { if (!acc[tx.date]) acc[tx.date] = []; acc[tx.date].push(tx); return acc }, {})
   const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a))
 
   const exportCSV = () => {
     const rows = [
-      ['Date', 'Category', 'Subcategory', 'Note', 'Amount', 'Type'],
-      ...filtered.map(t => [t.date, t.category, t.subcategory || '', t.note || '', t.amount, t.type])
+      ['Date','Category','Subcategory','Note','Amount','Type'],
+      ...filtered.map(t => [t.date, t.category, t.subcategory||'', t.note||'', t.amount, t.type])
     ]
-    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n')
     const a = document.createElement('a')
     a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
     a.download = `fintrack-${month.toISOString().slice(0,7)}.csv`
@@ -60,27 +56,25 @@ export default function Transactions() {
 
   return (
     <div className="screen">
-      {/* Header */}
       <div className="txns-header">
-        <h2 className="page-title">Activity</h2>
+        <h2 className="page-title">All Transactions</h2>
         <MonthNavigator date={month} onChange={setMonth} />
       </div>
+      <div className="txns-subtitle">View and manage all your financial transactions</div>
 
-      {/* Summary strip */}
+      {/* 3 summary cards */}
       <div className="txns-summary">
-        <div className="txns-stat">
-          <div className="txns-stat-label">Transactions</div>
-          <div className="txns-stat-value neutral">{transactions.length}</div>
+        <div className="txns-stat-card">
+          <div className="txns-stat-label">Total</div>
+          <div className="txns-stat-val neutral">{transactions.length}</div>
         </div>
-        <div className="txns-stat-divider" />
-        <div className="txns-stat">
-          <div className="txns-stat-label">Income</div>
-          <div className="txns-stat-value income">+{fmtCurrency(totalIncome, currency)}</div>
+        <div className="txns-stat-card income-bg">
+          <div className="txns-stat-label">Total Income</div>
+          <div className="txns-stat-val income">+{fmt(totalIncome)}</div>
         </div>
-        <div className="txns-stat-divider" />
-        <div className="txns-stat">
-          <div className="txns-stat-label">Expenses</div>
-          <div className="txns-stat-value expense">-{fmtCurrency(totalExpenses, currency)}</div>
+        <div className="txns-stat-card expense-bg">
+          <div className="txns-stat-label">Total Expenses</div>
+          <div className="txns-stat-val expense">-{fmt(totalExpenses)}</div>
         </div>
       </div>
 
@@ -89,38 +83,27 @@ export default function Transactions() {
         <div className="search-row">
           <div className="search-box">
             <span className="search-icon">🔍</span>
-            <input
-              placeholder="Search transactions..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+            <input placeholder="Search transactions..." value={search} onChange={e => setSearch(e.target.value)} />
             {search && <button onClick={() => setSearch('')} className="clear-search">✕</button>}
           </div>
-          <button className="export-btn" onClick={exportCSV} title="Export CSV">
-            ↓ Export
-          </button>
+          <button className="export-btn" onClick={exportCSV}>↓ Export</button>
         </div>
         <div className="seg-control">
-          {['all', 'expense', 'income'].map(f => (
-            <button
-              key={f}
-              className={`seg-btn ${filter === f ? 'active' : ''}`}
-              onClick={() => setFilter(f)}
-            >
-              {f === 'all' ? 'All' : f === 'expense' ? 'Expenses' : 'Income'}
-            </button>
+          {[['all','All'],['income','Income'],['expense','Expenses']].map(([v,l]) => (
+            <button key={v} className={`seg-btn ${filter === v ? 'active' : ''}`} onClick={() => setFilter(v)}>{l}</button>
           ))}
         </div>
       </div>
+
+      {filtered.length > 0 && (
+        <div className="txns-list-header">All Transactions ({filtered.length})</div>
+      )}
 
       <div className="scroll-area">
         {loading ? (
           <div className="load-row"><span className="spinner" /></div>
         ) : filtered.length === 0 ? (
-          <div className="empty-state">
-            <span className="icon">🔍</span>
-            <p>No transactions found.</p>
-          </div>
+          <div className="empty-state"><span className="icon">🔍</span><p>No transactions found.</p></div>
         ) : (
           sortedDates.map(date => (
             <div key={date} className="date-group">
@@ -147,8 +130,8 @@ export default function Transactions() {
 function formatGroupDate(dateStr) {
   try {
     const d = new Date(dateStr + 'T12:00:00')
-    const today = new Date()
-    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1)
+    const today = new Date(), yesterday = new Date(today)
+    yesterday.setDate(today.getDate() - 1)
     if (d.toDateString() === today.toDateString())     return 'Today'
     if (d.toDateString() === yesterday.toDateString()) return 'Yesterday'
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })

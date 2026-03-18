@@ -9,20 +9,21 @@ export default function TransactionItem({ tx, categories, onClick }) {
 
   return (
     <button className="tx-item" onClick={() => onClick && onClick(tx)}>
-      <div className={`tx-icon-wrap ${tx.type}`}>
-        <div className="tx-icon">{icon}</div>
-        <div className={`tx-arrow ${tx.type}`}>
-          {tx.type === 'income' ? '↙' : '↗'}
-        </div>
+      <div className={`tx-badge ${tx.type}`}>
+        <span className="tx-badge-arrow">{tx.type === 'income' ? '↙' : '↗'}</span>
       </div>
       <div className="tx-info">
-        <div className="tx-category">{tx.category}</div>
-        {tx.subcategory && <div className="tx-sub">{tx.subcategory}</div>}
-        {tx.note && <div className="tx-note">{tx.note}</div>}
-        <div className="tx-date">{fmtDate(tx.date)}</div>
+        <div className="tx-name">{tx.note || tx.category}</div>
+        <div className="tx-meta">
+          <span className="tx-cat">{icon} {tx.category}</span>
+          {tx.subcategory && <span className="tx-dot">·</span>}
+          {tx.subcategory && <span className="tx-sub">{tx.subcategory}</span>}
+          <span className="tx-dot">·</span>
+          <span className="tx-date">{fmtDate(tx.date)}</span>
+        </div>
       </div>
       <div className={`tx-amount ${tx.type}`}>
-        {tx.type === 'income' ? '+' : '-'}{fmtCurrency(tx.amount, currency)}
+        {tx.type === 'income' ? '+' : ''}{fmtCurrency(tx.amount, currency)}
       </div>
     </button>
   )

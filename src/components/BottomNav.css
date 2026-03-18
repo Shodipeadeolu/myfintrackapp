@@ -1,8 +1,6 @@
 .bottom-nav {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: 0; left: 0; right: 0;
   height: var(--nav-h);
   background: var(--bg-card);
   border-top: 1px solid var(--border);
@@ -24,11 +22,8 @@
 }
 
 .nav-icon {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
   transition: transform var(--transition);
 }
 
@@ -41,7 +36,7 @@
 }
 
 .nav-item.active .nav-icon {
-  transform: scale(1.08);
+  transform: scale(1.1);
   color: var(--accent);
 }
 

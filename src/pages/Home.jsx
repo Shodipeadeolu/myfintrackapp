@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import { getTransactions } from '../firebase/service'
 import { fmtCurrency, toFirestoreDate } from '../utils/helpers'
-import { startOfMonth, endOfMonth } from 'date-fns'
+import { startOfMonth, endOfMonth, format } from 'date-fns'
 import MonthNavigator from '../components/MonthNavigator'
 import TransactionItem from '../components/TransactionItem'
 import AddTransaction from '../components/AddTransaction'
@@ -10,55 +10,44 @@ import InviteBanner from '../components/InviteBanner'
 import './Home.css'
 
 export default function Home({ onNavigate }) {
-  const { user, householdId, categories, pendingInvites, handleAcceptInvite, theme, toggleTheme, household, dataLoading, reloadTrigger, currency } = useApp()
-  const [month, setMonth] = useState(new Date())
+  const { user, profile, householdId, categories, pendingInvites, handleAcceptInvite, theme, toggleTheme, household, dataLoading, reloadTrigger, currency } = useApp()
+  const [month, setMonth]           = useState(new Date())
   const [transactions, setTransactions] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [showAdd, setShowAdd] = useState(false)
-  const [editTx, setEditTx] = useState(null)
-
-  // Track previous householdId so we only reload when it actually changes
-  const prevHouseholdId = useRef(undefined)
+  const [loading, setLoading]       = useState(false)
+  const [showAdd, setShowAdd]       = useState(false)
+  const [editTx, setEditTx]         = useState(null)
+  const prevHouseholdId             = useRef(undefined)
 
   useEffect(() => {
-    // Skip if user not ready or householdId hasn't actually changed
     if (!user) return
     if (prevHouseholdId.current === householdId) return
     prevHouseholdId.current = householdId
     load()
-  }, [month, householdId, user])
+  }, [householdId, user])
+
+  useEffect(() => { if (!user) return; load() }, [month, reloadTrigger])
 
   const load = async () => {
     if (!user) return
     setLoading(true)
     try {
-      const start = toFirestoreDate(startOfMonth(month))
-      const end = toFirestoreDate(endOfMonth(month))
-      const txs = await getTransactions(user.uid, householdId, start, end)
+      const txs = await getTransactions(user.uid, householdId,
+        toFirestoreDate(startOfMonth(month)),
+        toFirestoreDate(endOfMonth(month))
+      )
       setTransactions(txs)
-    } catch (e) {
-      console.error('Home load error:', e)
-    } finally {
-      setLoading(false)
-    }
+    } catch (e) { console.error('Home load error:', e) }
+    finally { setLoading(false) }
   }
 
-  // Reload when month changes or after import
-  useEffect(() => {
-    if (!user) return
-    load()
-  }, [month, reloadTrigger])
-
-  const income = transactions.filter(t => t.type === 'income').reduce((a, t) => a + t.amount, 0)
+  const income   = transactions.filter(t => t.type === 'income').reduce((a, t) => a + t.amount, 0)
   const expenses = transactions.filter(t => t.type === 'expense').reduce((a, t) => a + t.amount, 0)
-  const balance = income - expenses
-  const recent = transactions.slice(0, 5)
+  const balance  = income - expenses
+  const savings  = balance > 0 ? balance : 0
+  const recent   = transactions.slice(0, 5)
+  const fmt      = n => fmtCurrency(n, currency)
 
-  const handleSaved = () => {
-    setShowAdd(false)
-    setEditTx(null)
-    load()
-  }
+  const handleSaved = () => { setShowAdd(false); setEditTx(null); load() }
 
   return (
     <div className="screen">
@@ -66,71 +55,74 @@ export default function Home({ onNavigate }) {
         {/* Header */}
         <div className="home-header">
           <div>
-            <div className="home-greeting">Good {getGreeting()}</div>
-            {household && <div className="home-household">🏠 {household.name}</div>}
+            <div className="home-greeting">Welcome back, {firstName(profile, user)}!</div>
+            <div className="home-subtitle">Here's what's happening with your finances today.</div>
           </div>
-          <button className="theme-btn" onClick={toggleTheme}>{theme === 'light' ? '🌙' : '☀️'}</button>
+          <button className="theme-btn" onClick={toggleTheme}>
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
         </div>
 
-        {/* Invite banners */}
         {pendingInvites.map(invite => (
           <InviteBanner key={invite.id} invite={invite} onAccept={handleAcceptInvite} />
         ))}
 
-        {/* Balance card */}
+        {/* Total Balance card — green gradient */}
         <div className="balance-card">
-          <div className="balance-nav">
+          <div className="balance-nav-row">
             <MonthNavigator date={month} onChange={setMonth} />
           </div>
-          <div className="balance-label">Net Balance</div>
-          <div className={`balance-amount ${balance < 0 ? 'negative' : ''}`}>
-            {fmtCurrency(balance, currency)}
+          <div className="balance-label">Total Balance</div>
+          <div className={`balance-amount ${balance < 0 ? 'negative' : ''}`}>{fmt(balance)}</div>
+          <div className="balance-change">
+            <span className={balance >= 0 ? 'change-up' : 'change-down'}>
+              {balance >= 0 ? '↗' : '↘'} {fmt(Math.abs(expenses))}
+            </span>
+            <span className="change-label"> expenses this month</span>
           </div>
-          <div className="summary-row">
-            <div className="summary-item income">
-              <span className="summary-icon">↓</span>
-              <div>
-                <div className="summary-label">Income</div>
-                <div className="summary-value">{fmtCurrency(income, currency)}</div>
-              </div>
-            </div>
-            <div className="summary-divider" />
-            <div className="summary-item expense">
-              <span className="summary-icon">↑</span>
-              <div>
-                <div className="summary-label">Expenses</div>
-                <div className="summary-value">{fmtCurrency(expenses, currency)}</div>
-              </div>
-            </div>
+        </div>
+
+        {/* 3 stat cards */}
+        <div className="home-stat-cards">
+          <div className="stat-card income-card">
+            <div className="stat-card-icon income-icon">↗</div>
+            <div className="stat-card-label">Income</div>
+            <div className="stat-card-value income-val">{fmt(income)}</div>
+          </div>
+          <div className="stat-card expense-card">
+            <div className="stat-card-icon expense-icon">↘</div>
+            <div className="stat-card-label">Expenses</div>
+            <div className="stat-card-value expense-val">{fmt(expenses)}</div>
+          </div>
+          <div className="stat-card savings-card">
+            <div className="stat-card-icon savings-icon">🐖</div>
+            <div className="stat-card-label">Savings</div>
+            <div className="stat-card-value savings-val">{fmt(savings)}</div>
           </div>
         </div>
 
         {/* Quick actions */}
         <div className="quick-actions">
           <button className="qa-btn" onClick={() => setShowAdd(true)}>
-            <span className="qa-icon">＋</span>
-            <span>Add</span>
+            <span className="qa-icon">＋</span><span>Add</span>
           </button>
           <button className="qa-btn" onClick={() => onNavigate('budgets')}>
-            <span className="qa-icon">🎯</span>
-            <span>Budgets</span>
+            <span className="qa-icon">🎯</span><span>Budgets</span>
           </button>
           <button className="qa-btn" onClick={() => onNavigate('stats')}>
-            <span className="qa-icon">◎</span>
-            <span>Stats</span>
+            <span className="qa-icon">◎</span><span>Stats</span>
           </button>
           <button className="qa-btn" onClick={() => onNavigate('transactions')}>
-            <span className="qa-icon">↕</span>
-            <span>All</span>
+            <span className="qa-icon">↕</span><span>All</span>
           </button>
         </div>
 
-        {/* Recent transactions */}
-        <div className="section">
-          <div className="section-header">
-            <h3>Recent</h3>
+        {/* Recent Transactions */}
+        <div className="home-section">
+          <div className="home-section-header">
+            <span className="home-section-title">Recent Transactions</span>
             {transactions.length > 5 && (
-              <button className="see-all" onClick={() => onNavigate('transactions')}>See all</button>
+              <button className="view-all-btn" onClick={() => onNavigate('transactions')}>View All</button>
             )}
           </div>
           {loading || dataLoading ? (
@@ -141,14 +133,11 @@ export default function Home({ onNavigate }) {
               <p>No transactions this month.<br />Tap + to add one.</p>
             </div>
           ) : (
-            recent.map(tx => (
-              <TransactionItem
-                key={tx.id}
-                tx={tx}
-                categories={categories}
-                onClick={setEditTx}
-              />
-            ))
+            <div className="recent-list">
+              {recent.map(tx => (
+                <TransactionItem key={tx.id} tx={tx} categories={categories} onClick={setEditTx} />
+              ))}
+            </div>
           )}
         </div>
       </div>
@@ -164,9 +153,7 @@ export default function Home({ onNavigate }) {
   )
 }
 
-function getGreeting() {
-  const h = new Date().getHours()
-  if (h < 12) return 'morning'
-  if (h < 17) return 'afternoon'
-  return 'evening'
+function firstName(profile, user) {
+  const name = profile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'there'
+  return name.split(' ')[0]
 }

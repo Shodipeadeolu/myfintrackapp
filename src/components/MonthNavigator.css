@@ -5,19 +5,15 @@
 }
 
 .month-btn {
-  width: 32px;
-  height: 32px;
+  width: 32px; height: 32px;
   border-radius: 50%;
   background: var(--bg-elevated);
   color: var(--text-secondary);
   font-size: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex; align-items: center; justify-content: center;
   transition: all var(--transition);
 }
-
-.month-btn:active { opacity: 0.6; transform: scale(0.9); }
+.month-btn:active  { opacity: 0.6; transform: scale(0.9); }
 .month-btn:disabled { opacity: 0.3; pointer-events: none; }
 
 .month-label {
@@ -26,4 +22,16 @@
   color: var(--text-primary);
   min-width: 130px;
   text-align: center;
+}
+
+/* Inside the green balance card — white override */
+.balance-nav-row .month-nav .month-label {
+  color: rgba(255,255,255,0.9);
+}
+.balance-nav-row .month-nav .month-btn {
+  background: rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.9);
+}
+.balance-nav-row .month-nav .month-btn:disabled {
+  opacity: 0.3;
 }
