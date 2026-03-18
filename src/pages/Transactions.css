@@ -2,15 +2,55 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px 12px;
+  padding: 16px 20px 10px;
   flex-shrink: 0;
 }
 
-.page-title {
-  font-size: 22px;
-  font-weight: 800;
+.page-title { font-size: 22px; font-weight: 800; }
+
+/* Summary strip */
+.txns-summary {
+  display: flex;
+  align-items: center;
+  margin: 0 20px 12px;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
 }
 
+.txns-stat { flex: 1; text-align: center; }
+
+.txns-stat-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+.txns-stat-value {
+  font-size: clamp(11px, 3vw, 14px);
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.txns-stat-value.neutral { color: var(--text-primary); }
+.txns-stat-value.income  { color: var(--green); }
+.txns-stat-value.expense { color: var(--accent); }
+
+.txns-stat-divider {
+  width: 1px; height: 32px;
+  background: var(--border);
+  margin: 0 8px;
+  flex-shrink: 0;
+}
+
+/* Filters */
 .txns-filters {
   padding: 0 20px 12px;
   display: flex;
@@ -19,7 +59,14 @@
   flex-shrink: 0;
 }
 
+.search-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .search-box {
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -31,41 +78,31 @@
 }
 
 .search-box:focus-within { border-color: var(--accent); }
-
 .search-icon { font-size: 14px; }
-
-.search-box input {
-  flex: 1;
-  background: transparent;
-  font-size: 14px;
-  color: var(--text-primary);
-}
-
+.search-box input { flex: 1; background: transparent; font-size: 14px; color: var(--text-primary); }
 .search-box input::placeholder { color: var(--text-muted); }
+.clear-search { color: var(--text-muted); font-size: 12px; padding: 2px; }
 
-.clear-search {
-  color: var(--text-muted);
-  font-size: 12px;
-  padding: 2px;
-}
-
-.date-group {
-  padding: 0 20px;
-  margin-bottom: 8px;
-}
-
-.date-label {
+.export-btn {
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 8px;
-  margin-top: 4px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all var(--transition);
+}
+.export-btn:active { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
+
+/* Date groups */
+.date-group { padding: 0 20px; margin-bottom: 8px; }
+.date-label {
+  font-size: 12px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: 8px; margin-top: 4px;
 }
 
-.load-row {
-  display: flex;
-  justify-content: center;
-  padding: 48px;
-}
+.load-row { display: flex; justify-content: center; padding: 48px; }

@@ -107,3 +107,71 @@
   font-weight: 600 !important;
   padding: 8px !important;
 }
+
+/* ── Subcategory inline editing ─────────────────────────────── */
+.subcat-chip-wrap { width: 100%; }
+
+.subcat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-elevated);
+  border-radius: 20px;
+  padding: 5px 10px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.subcat-chip-label {
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.subcat-chip-label:active { opacity: 0.6; }
+
+.subcat-edit-ico {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 0 2px;
+  opacity: 0.7;
+}
+
+.subcat-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--accent);
+  border-radius: 20px;
+  padding: 4px 10px;
+}
+
+.subcat-edit-input {
+  flex: 1;
+  background: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  min-width: 0;
+}
+
+.subcat-save-btn {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--green);
+  padding: 0 4px;
+}
+
+.subcat-cancel-btn {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+
+.subcat-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  font-style: italic;
+}

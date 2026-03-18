@@ -3,37 +3,38 @@ import { useApp } from '../context/AppContext'
 import { addTransaction, updateTransaction, deleteTransaction } from '../firebase/service'
 import { toFirestoreDate } from '../utils/helpers'
 import CategoryPicker from './CategoryPicker'
+import Toast from './Toast'
 import './AddTransaction.css'
 
 export default function AddTransaction({ tx, onClose, onSaved }) {
-  const { user, householdId, categories, canWrite } = useApp()
+  const { user, householdId, categories, canWrite, currency } = useApp()
   const editing = !!tx
 
-  const [type, setType] = useState(tx?.type || 'expense')
-  const [amount, setAmount] = useState(tx?.amount ? String(tx.amount) : '')
-  const [category, setCategory] = useState(tx?.category || '')
+  const [type, setType]             = useState(tx?.type || 'expense')
+  const [amount, setAmount]         = useState(tx?.amount ? String(tx.amount) : '')
+  const [category, setCategory]     = useState(tx?.category || '')
   const [subcategory, setSubcategory] = useState(tx?.subcategory || '')
-  const [date, setDate] = useState(tx?.date || toFirestoreDate(new Date()))
-  const [note, setNote] = useState(tx?.note || '')
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
+  const [date, setDate]             = useState(tx?.date || toFirestoreDate(new Date()))
+  const [note, setNote]             = useState(tx?.note || '')
+  const [saving, setSaving]         = useState(false)
+  const [deleting, setDeleting]     = useState(false)
   const [showCatPicker, setShowCatPicker] = useState(false)
   const [showSubPicker, setShowSubPicker] = useState(false)
-  const [err, setErr] = useState('')
+  const [err, setErr]               = useState('')
+  const [toast, setToast]           = useState(null)
 
   const filteredCats = categories.filter(c => c.type === type)
-  const selectedCat = categories.find(c => c.name === category)
-  const subcats = selectedCat?.subcategories || []
+  const selectedCat  = categories.find(c => c.name === category)
+  const subcats      = selectedCat?.subcategories || []
 
-  useEffect(() => {
-    setCategory('')
-    setSubcategory('')
-  }, [type])
+  useEffect(() => { setCategory(''); setSubcategory('') }, [type])
 
   const handleCatSelect = (cat) => {
-    setCategory(cat.name)
-    setSubcategory('')
-    setShowCatPicker(false)
+    setCategory(cat.name); setSubcategory(''); setShowCatPicker(false)
+  }
+
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type })
   }
 
   const handleSave = async () => {
@@ -43,19 +44,18 @@ export default function AddTransaction({ tx, onClose, onSaved }) {
     setErr('')
     setSaving(true)
     try {
-      const data = {
-        type, amount: parseFloat(amount),
-        category, subcategory, date, note: note.trim()
-      }
+      const data = { type, amount: parseFloat(amount), category, subcategory, date, note: note.trim() }
       if (editing) {
         await updateTransaction(tx.id, data)
+        showToast('Transaction updated')
       } else {
         await addTransaction(user.uid, householdId, data)
+        showToast('Transaction saved!')
       }
-      onSaved()
+      // Small delay so toast is visible before sheet closes
+      setTimeout(() => onSaved(), 800)
     } catch (e) {
       setErr('Save failed. Try again.')
-    } finally {
       setSaving(false)
     }
   }
@@ -68,13 +68,14 @@ export default function AddTransaction({ tx, onClose, onSaved }) {
       onSaved()
     } catch {
       setErr('Delete failed.')
-    } finally {
       setDeleting(false)
     }
   }
 
   return (
     <>
+      {toast && <Toast message={toast.msg} type={toast.type} onDone={() => setToast(null)} />}
+
       <div className="sheet-overlay" onClick={onClose} />
       <div className="sheet">
         <div className="sheet-handle" />
@@ -90,7 +91,6 @@ export default function AddTransaction({ tx, onClose, onSaved }) {
         </div>
 
         <div className="sheet-body">
-          {/* Type toggle */}
           <div className="type-toggle">
             {['expense', 'income'].map(t => (
               <button
@@ -103,60 +103,46 @@ export default function AddTransaction({ tx, onClose, onSaved }) {
             ))}
           </div>
 
-          {/* Amount */}
           <div className="amount-field">
-            <span className="currency-sym">$</span>
+            <span className="currency-sym">
+              {new Intl.NumberFormat('en', { style: 'currency', currency: currency || 'USD' })
+                .format(0).replace(/[\d.,\s]/g, '').trim() || '$'}
+            </span>
             <input
-              type="number"
-              inputMode="decimal"
-              placeholder="0.00"
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              className="amount-input"
-              autoFocus={!editing}
+              type="number" inputMode="decimal" placeholder="0.00"
+              value={amount} onChange={e => setAmount(e.target.value)}
+              className="amount-input" autoFocus={!editing}
             />
           </div>
 
-          {/* Category */}
           <div className="field">
             <label>Category</label>
-            <button
-              className="picker-btn"
-              onClick={() => setShowCatPicker(true)}
-            >
+            <button className="picker-btn" onClick={() => setShowCatPicker(true)}>
               <span>{selectedCat ? `${selectedCat.icon} ${selectedCat.name}` : 'Select category'}</span>
               <span className="picker-arrow">›</span>
             </button>
           </div>
 
-          {/* Subcategory */}
           {subcats.length > 0 && (
             <div className="field">
               <label>Subcategory</label>
-              <button
-                className="picker-btn"
-                onClick={() => setShowSubPicker(true)}
-              >
+              <button className="picker-btn" onClick={() => setShowSubPicker(true)}>
                 <span>{subcategory || 'Select subcategory'}</span>
                 <span className="picker-arrow">›</span>
               </button>
             </div>
           )}
 
-          {/* Date */}
           <div className="field">
             <label>Date</label>
             <input type="date" value={date} onChange={e => setDate(e.target.value)} />
           </div>
 
-          {/* Note */}
           <div className="field">
             <label>Note (optional)</label>
             <input
-              type="text"
-              placeholder="What was this for?"
-              value={note}
-              onChange={e => setNote(e.target.value)}
+              type="text" placeholder="What was this for?"
+              value={note} onChange={e => setNote(e.target.value)}
             />
           </div>
 
@@ -164,28 +150,22 @@ export default function AddTransaction({ tx, onClose, onSaved }) {
 
           {canWrite && (
             <button
-              className={`btn btn-primary btn-full save-btn`}
-              onClick={handleSave}
-              disabled={saving}
+              className="btn btn-primary btn-full save-btn"
+              onClick={handleSave} disabled={saving}
             >
-              {saving ? <span className="spinner" /> : (editing ? 'Save Changes' : 'Add Transaction')}
+              {saving ? <span className="spinner" /> : editing ? 'Save Changes' : 'Add Transaction'}
             </button>
           )}
         </div>
       </div>
 
-      {/* Category picker */}
       {showCatPicker && (
         <CategoryPicker
-          categories={filteredCats}
-          selected={category}
-          onSelect={handleCatSelect}
-          onClose={() => setShowCatPicker(false)}
+          categories={filteredCats} selected={category}
+          onSelect={handleCatSelect} onClose={() => setShowCatPicker(false)}
           title="Pick Category"
         />
       )}
-
-      {/* Subcategory picker */}
       {showSubPicker && (
         <CategoryPicker
           categories={subcats.map(s => ({ name: s, icon: '·' }))}

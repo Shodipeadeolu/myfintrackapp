@@ -45,10 +45,8 @@
 .balance-card::before {
   content: '';
   position: absolute;
-  top: -40px;
-  right: -40px;
-  width: 160px;
-  height: 160px;
+  top: -40px; right: -40px;
+  width: 160px; height: 160px;
   border-radius: 50%;
   background: rgba(255,255,255,0.05);
 }
@@ -56,10 +54,8 @@
 .balance-card::after {
   content: '';
   position: absolute;
-  bottom: -60px;
-  left: -20px;
-  width: 200px;
-  height: 200px;
+  bottom: -60px; left: -20px;
+  width: 200px; height: 200px;
   border-radius: 50%;
   background: rgba(255,255,255,0.03);
 }
@@ -71,7 +67,7 @@
 }
 
 .balance-nav .month-label { color: rgba(255,255,255,0.7); font-size: 13px; }
-.balance-nav .month-btn { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.7); }
+.balance-nav .month-btn   { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.7); }
 
 .balance-label {
   font-size: 12px;
@@ -83,12 +79,16 @@
   z-index: 1;
 }
 
+/* Responsive font size — never overflows the card */
 .balance-amount {
-  font-size: 38px;
+  font-size: clamp(22px, 6vw, 34px);
   font-weight: 800;
   margin: 6px 0 20px;
   position: relative;
   z-index: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .balance-amount.negative { color: #f87171; }
@@ -96,53 +96,59 @@
 .summary-row {
   display: flex;
   align-items: center;
-  gap: 0;
   background: rgba(255,255,255,0.08);
   border-radius: var(--radius-md);
-  padding: 12px 16px;
+  padding: 12px 14px;
   position: relative;
   z-index: 1;
+  min-width: 0;
 }
 
 .summary-item {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
 }
 
 .summary-divider {
   width: 1px;
   height: 32px;
   background: rgba(255,255,255,0.15);
-  margin: 0 16px;
+  margin: 0 12px;
+  flex-shrink: 0;
 }
 
 .summary-icon {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   flex-shrink: 0;
 }
 
-.income .summary-icon { background: rgba(46,168,101,0.25); color: #5dd89e; }
-.expense .summary-icon { background: rgba(240,90,48,0.25); color: #f08060; }
+.income .summary-icon  { background: rgba(46,168,101,0.25); color: #5dd89e; }
+.expense .summary-icon { background: rgba(240,90,48,0.25);  color: #f08060; }
 
 .summary-label {
-  font-size: 11px;
+  font-size: 10px;
   opacity: 0.6;
   font-weight: 500;
 }
 
+/* Responsive value — shrinks on narrow screens */
 .summary-value {
-  font-size: 15px;
+  font-size: clamp(12px, 3.5vw, 15px);
   font-weight: 700;
   margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Quick actions */
@@ -187,19 +193,8 @@
   margin-bottom: 12px;
 }
 
-.section-header h3 {
-  font-size: 16px;
-  font-weight: 700;
-}
+.section-header h3 { font-size: 16px; font-weight: 700; }
 
-.see-all {
-  font-size: 13px;
-  color: var(--accent);
-  font-weight: 600;
-}
+.see-all { font-size: 13px; color: var(--accent); font-weight: 600; }
 
-.load-row {
-  display: flex;
-  justify-content: center;
-  padding: 32px;
-}
+.load-row { display: flex; justify-content: center; padding: 32px; }

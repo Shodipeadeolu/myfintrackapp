@@ -1,68 +1,59 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import { getTransactions } from '../firebase/service'
 import { getBudgets, addBudget, updateBudget, deleteBudget } from '../firebase/budgets'
 import { fmtCurrency, toFirestoreDate } from '../utils/helpers'
-import { startOfMonth, endOfMonth, format } from 'date-fns'
+import { startOfMonth, endOfMonth } from 'date-fns'
 import MonthNavigator from '../components/MonthNavigator'
 import CategoryPicker from '../components/CategoryPicker'
 import './Budgets.css'
 
 export default function Budgets() {
   const { user, householdId, categories, canWrite, reloadTrigger, currency } = useApp()
-  const [month, setMonth] = useState(new Date())
+  const [month, setMonth]     = useState(new Date())
   const [budgets, setBudgets] = useState([])
-  const [spending, setSpending] = useState({}) // { categoryName: totalSpent }
+  const [spending, setSpending] = useState({})
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [editBudget, setEditBudget] = useState(null)
 
-  useEffect(() => { load() }, [month, householdId])
+  useEffect(() => { load() }, [month, householdId, reloadTrigger])
 
   const load = async () => {
     setLoading(true)
     try {
       const [buds, txs] = await Promise.all([
         getBudgets(user.uid, householdId),
-        getTransactions(
-          user.uid, householdId,
+        getTransactions(user.uid, householdId,
           toFirestoreDate(startOfMonth(month)),
           toFirestoreDate(endOfMonth(month))
         )
       ])
       setBudgets(buds)
-
-      // Build spending map
       const map = {}
       txs.filter(t => t.type === 'expense').forEach(t => {
         map[t.category] = (map[t.category] || 0) + t.amount
       })
       setSpending(map)
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
+
+  const fmt = (n) => fmtCurrency(n, currency)
 
   const totalBudgeted = budgets.reduce((a, b) => a + b.amount, 0)
-  const totalSpent = budgets.reduce((a, b) => a + (spending[b.category] || 0), 0)
-  const totalRemaining = totalBudgeted - totalSpent
-  const overallPct = totalBudgeted > 0 ? Math.min((totalSpent / totalBudgeted) * 100, 100) : 0
+  const totalSpent    = budgets.reduce((a, b) => a + (spending[b.category] || 0), 0)
+  const totalLeft     = totalBudgeted - totalSpent
+  const overallPct    = totalBudgeted > 0 ? Math.min((totalSpent / totalBudgeted) * 100, 100) : 0
 
-  const handleSaved = () => {
-    setShowAdd(false)
-    setEditBudget(null)
-    load()
-  }
-
-  // Sort: over-budget first, then by % used descending
   const sorted = [...budgets].sort((a, b) => {
     const aSpent = spending[a.category] || 0
     const bSpent = spending[b.category] || 0
-    const aOver = aSpent > a.amount
-    const bOver = bSpent > b.amount
+    const aOver = aSpent > a.amount, bOver = bSpent > b.amount
     if (aOver !== bOver) return aOver ? -1 : 1
     return (bSpent / b.amount) - (aSpent / a.amount)
   })
+
+  const handleSaved = () => { setShowAdd(false); setEditBudget(null); load() }
 
   return (
     <div className="screen">
@@ -79,35 +70,22 @@ export default function Budgets() {
             {/* Summary card */}
             {budgets.length > 0 && (
               <div className="budget-summary-card">
-                <div className="bsc-row">
-                  <div className="bsc-item">
-                    <div className="bsc-label">Budgeted</div>
-                    <div className="bsc-value">{fmtCurrency(totalBudgeted, currency)}</div>
-                  </div>
-                  <div className="bsc-item">
-                    <div className="bsc-label">Spent</div>
-                    <div className={`bsc-value ${totalSpent > totalBudgeted ? 'over' : ''}`}>
-                      {fmtCurrency(totalSpent, currency)}
-                    </div>
-                  </div>
-                  <div className="bsc-item">
-                    <div className="bsc-label">{totalRemaining < 0 ? 'Over by' : 'Left'}</div>
-                    <div className={`bsc-value ${totalRemaining < 0 ? 'over' : 'under'}`}>
-                      {fmtCurrency(Math.abs(totalRemaining), currency)}
-                    </div>
-                  </div>
+                <div className="bsc-title">Total Monthly Budget</div>
+                <div className="bsc-total">{fmt(totalBudgeted)}</div>
+                <div className="bsc-subtitle">
+                  {fmt(totalSpent)} spent · {totalLeft >= 0 ? fmt(totalLeft) + ' remaining' : fmt(Math.abs(totalLeft)) + ' over budget'}
                 </div>
                 <div className="bsc-track">
-                  <div
-                    className={`bsc-fill ${overallPct >= 100 ? 'danger' : overallPct >= 80 ? 'warn' : 'good'}`}
-                    style={{ width: `${overallPct}%` }}
-                  />
+                  <div className="bsc-fill" style={{ width: `${overallPct}%` }} />
                 </div>
-                <div className="bsc-pct">{Math.round(overallPct)}% of total budget used</div>
+                <div className="bsc-footer">
+                  <span className="bsc-pct">Overall Progress</span>
+                  <span className="bsc-remaining">{Math.round(overallPct)}%</span>
+                </div>
               </div>
             )}
 
-            {/* Budget list */}
+            {/* Budget cards */}
             {sorted.length === 0 ? (
               <div className="empty-state" style={{ marginTop: 60 }}>
                 <span className="icon">🎯</span>
@@ -116,13 +94,14 @@ export default function Budgets() {
             ) : (
               <div className="budget-list">
                 {sorted.map(budget => {
-                  const spent = spending[budget.category] || 0
-                  const pct = budget.amount > 0 ? Math.min((spent / budget.amount) * 100, 100) : 0
-                  const over = spent > budget.amount
+                  const spent     = spending[budget.category] || 0
+                  const rawPct    = budget.amount > 0 ? (spent / budget.amount) * 100 : 0
+                  const pct       = Math.min(rawPct, 100)
+                  const over      = spent > budget.amount
                   const remaining = budget.amount - spent
-                  const cat = categories.find(c => c.name === budget.category)
-                  const icon = cat?.icon || '📦'
-                  const status = over ? 'danger' : pct >= 80 ? 'warn' : 'good'
+                  const cat       = categories.find(c => c.name === budget.category)
+                  const icon      = cat?.icon || '📦'
+                  const status    = over ? 'danger' : rawPct >= 80 ? 'warn' : 'good'
 
                   return (
                     <button
@@ -139,10 +118,8 @@ export default function Budgets() {
                           </div>
                         </div>
                         <div className="bc-right">
-                          <div className={`bc-spent ${over ? 'over' : ''}`}>
-                            {fmtCurrency(spent, currency)}
-                          </div>
-                          <div className="bc-limit">of {fmtCurrency(budget.amount, currency)}</div>
+                          <div className={`bc-spent ${over ? 'over' : ''}`}>{fmt(spent)}</div>
+                          <div className="bc-limit">of {fmt(budget.amount)}</div>
                         </div>
                       </div>
 
@@ -153,14 +130,22 @@ export default function Budgets() {
                       <div className="bc-bottom">
                         <span className={`bc-badge ${status}`}>
                           {over
-                            ? `Over by ${fmtCurrency(Math.abs(remaining), currency)}`
-                            : pct >= 80
-                              ? `⚠ ${fmtCurrency(remaining, currency)} left`
-                              : `${fmtCurrency(remaining, currency)} left`
+                            ? `↘ Over by ${fmt(Math.abs(remaining))}`
+                            : rawPct >= 80
+                              ? `⚠ ${fmt(remaining)} left`
+                              : `↗ ${fmt(remaining)} left`
                           }
                         </span>
-                        <span className="bc-pct">{Math.round(pct)}%</span>
+                        <span className="bc-pct">{Math.round(rawPct)}%</span>
                       </div>
+
+                      {/* Warning message */}
+                      {rawPct >= 80 && !over && (
+                        <div className="bc-warning warn">⚠ Approaching budget limit</div>
+                      )}
+                      {over && (
+                        <div className="bc-warning danger">⚠ Budget exceeded — consider adjusting spending</div>
+                      )}
                     </button>
                   )
                 })}
@@ -188,62 +173,47 @@ export default function Budgets() {
           onDeleted={handleSaved}
           user={user}
           householdId={householdId}
+          currency={currency}
         />
       )}
     </div>
   )
 }
 
-// ─── Add / Edit Budget Sheet ───────────────────────────────────
-function BudgetSheet({ budget, categories, existingCategories, onClose, onSaved, onDeleted, user, householdId }) {
+function BudgetSheet({ budget, categories, existingCategories, onClose, onSaved, onDeleted, user, householdId, currency }) {
   const editing = !!budget
   const [category, setCategory] = useState(budget?.category || '')
-  const [amount, setAmount] = useState(budget?.amount ? String(budget.amount) : '')
-  const [note, setNote] = useState(budget?.note || '')
-  const [saving, setSaving] = useState(false)
+  const [amount, setAmount]     = useState(budget?.amount ? String(budget.amount) : '')
+  const [note, setNote]         = useState(budget?.note || '')
+  const [saving, setSaving]     = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [err, setErr] = useState('')
+  const [err, setErr]           = useState('')
   const [showCatPicker, setShowCatPicker] = useState(false)
 
-  // Filter out categories already budgeted (unless editing that one)
   const availableCats = categories.filter(
     c => !existingCategories.includes(c.name) || c.name === budget?.category
   )
-
   const selectedCat = categories.find(c => c.name === category)
+  const sym = new Intl.NumberFormat('en', { style: 'currency', currency: currency || 'USD' })
+    .format(0).replace(/[\d.,\s]/g, '').trim() || '$'
 
   const handleSave = async () => {
     if (!category) return setErr('Select a category')
     const amt = parseFloat(amount)
     if (!amount || isNaN(amt) || amt <= 0) return setErr('Enter a valid amount')
-    setErr('')
-    setSaving(true)
+    setErr(''); setSaving(true)
     try {
       const data = { category, amount: amt, note: note.trim() }
-      if (editing) {
-        await updateBudget(budget.id, data)
-      } else {
-        await addBudget(user.uid, householdId, data)
-      }
+      editing ? await updateBudget(budget.id, data) : await addBudget(user.uid, householdId, data)
       onSaved()
-    } catch (e) {
-      setErr('Save failed. Try again.')
-    } finally {
-      setSaving(false)
-    }
+    } catch { setErr('Save failed. Try again.') } finally { setSaving(false) }
   }
 
   const handleDelete = async () => {
     if (!window.confirm('Delete this budget?')) return
     setDeleting(true)
-    try {
-      await deleteBudget(budget.id)
-      onDeleted()
-    } catch {
-      setErr('Delete failed.')
-    } finally {
-      setDeleting(false)
-    }
+    try { await deleteBudget(budget.id); onDeleted() }
+    catch { setErr('Delete failed.') } finally { setDeleting(false) }
   }
 
   return (
@@ -269,52 +239,31 @@ function BudgetSheet({ budget, categories, existingCategories, onClose, onSaved,
               <span className="picker-arrow">›</span>
             </button>
           </div>
-
           <div className="field">
             <label>Monthly Limit</label>
             <div className="amount-field">
-              <span className="currency-sym">$</span>
-              <input
-                type="number"
-                inputMode="decimal"
-                placeholder="0.00"
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
-                className="amount-input"
-                autoFocus={!editing}
-              />
+              <span className="currency-sym">{sym}</span>
+              <input type="number" inputMode="decimal" placeholder="0.00"
+                value={amount} onChange={e => setAmount(e.target.value)}
+                className="amount-input" autoFocus={!editing} />
             </div>
           </div>
-
           <div className="field">
             <label>Note (optional)</label>
-            <input
-              type="text"
-              placeholder="e.g. Groceries only"
-              value={note}
-              onChange={e => setNote(e.target.value)}
-            />
+            <input type="text" placeholder="e.g. Groceries only"
+              value={note} onChange={e => setNote(e.target.value)} />
           </div>
-
           {err && <p className="form-err">{err}</p>}
-
-          <button
-            className="btn btn-primary btn-full save-btn"
-            onClick={handleSave}
-            disabled={saving}
-          >
+          <button className="btn btn-primary btn-full save-btn" onClick={handleSave} disabled={saving}>
             {saving ? <span className="spinner" /> : editing ? 'Save Changes' : 'Add Budget'}
           </button>
         </div>
       </div>
-
       {showCatPicker && (
         <CategoryPicker
-          categories={availableCats}
-          selected={category}
+          categories={availableCats} selected={category}
           onSelect={c => { setCategory(c.name); setShowCatPicker(false) }}
-          onClose={() => setShowCatPicker(false)}
-          title="Pick Category"
+          onClose={() => setShowCatPicker(false)} title="Pick Category"
         />
       )}
     </>

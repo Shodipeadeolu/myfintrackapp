@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import { getTransactions } from '../firebase/service'
-import { toFirestoreDate } from '../utils/helpers'
+import { fmtCurrency, toFirestoreDate } from '../utils/helpers'
 import { startOfMonth, endOfMonth } from 'date-fns'
 import MonthNavigator from '../components/MonthNavigator'
 import TransactionItem from '../components/TransactionItem'
@@ -9,13 +9,13 @@ import AddTransaction from '../components/AddTransaction'
 import './Transactions.css'
 
 export default function Transactions() {
-  const { user, householdId, categories, reloadTrigger } = useApp()
-  const [month, setMonth] = useState(new Date())
+  const { user, householdId, categories, reloadTrigger, currency } = useApp()
+  const [month, setMonth]           = useState(new Date())
   const [transactions, setTransactions] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('all')
-  const [search, setSearch] = useState('')
-  const [editTx, setEditTx] = useState(null)
+  const [loading, setLoading]       = useState(true)
+  const [filter, setFilter]         = useState('all')
+  const [search, setSearch]         = useState('')
+  const [editTx, setEditTx]         = useState(null)
 
   useEffect(() => { load() }, [month, householdId, reloadTrigger])
 
@@ -23,8 +23,8 @@ export default function Transactions() {
     setLoading(true)
     try {
       const start = toFirestoreDate(startOfMonth(month))
-      const end = toFirestoreDate(endOfMonth(month))
-      const txs = await getTransactions(user.uid, householdId, start, end)
+      const end   = toFirestoreDate(endOfMonth(month))
+      const txs   = await getTransactions(user.uid, householdId, start, end)
       setTransactions(txs)
     } finally {
       setLoading(false)
@@ -36,31 +36,69 @@ export default function Transactions() {
     .filter(t => !search || [t.category, t.subcategory, t.note]
       .some(f => f?.toLowerCase().includes(search.toLowerCase())))
 
+  const totalIncome   = transactions.filter(t => t.type === 'income').reduce((a, t) => a + t.amount, 0)
+  const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((a, t) => a + t.amount, 0)
+
   const grouped = filtered.reduce((acc, tx) => {
-    const key = tx.date
-    if (!acc[key]) acc[key] = []
-    acc[key].push(tx)
+    if (!acc[tx.date]) acc[tx.date] = []
+    acc[tx.date].push(tx)
     return acc
   }, {})
-
   const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a))
+
+  const exportCSV = () => {
+    const rows = [
+      ['Date', 'Category', 'Subcategory', 'Note', 'Amount', 'Type'],
+      ...filtered.map(t => [t.date, t.category, t.subcategory || '', t.note || '', t.amount, t.type])
+    ]
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const a = document.createElement('a')
+    a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv)
+    a.download = `fintrack-${month.toISOString().slice(0,7)}.csv`
+    a.click()
+  }
 
   return (
     <div className="screen">
+      {/* Header */}
       <div className="txns-header">
         <h2 className="page-title">Activity</h2>
         <MonthNavigator date={month} onChange={setMonth} />
       </div>
 
+      {/* Summary strip */}
+      <div className="txns-summary">
+        <div className="txns-stat">
+          <div className="txns-stat-label">Transactions</div>
+          <div className="txns-stat-value neutral">{transactions.length}</div>
+        </div>
+        <div className="txns-stat-divider" />
+        <div className="txns-stat">
+          <div className="txns-stat-label">Income</div>
+          <div className="txns-stat-value income">+{fmtCurrency(totalIncome, currency)}</div>
+        </div>
+        <div className="txns-stat-divider" />
+        <div className="txns-stat">
+          <div className="txns-stat-label">Expenses</div>
+          <div className="txns-stat-value expense">-{fmtCurrency(totalExpenses, currency)}</div>
+        </div>
+      </div>
+
+      {/* Filters */}
       <div className="txns-filters">
-        <div className="search-box">
-          <span className="search-icon">🔍</span>
-          <input
-            placeholder="Search transactions..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          {search && <button onClick={() => setSearch('')} className="clear-search">✕</button>}
+        <div className="search-row">
+          <div className="search-box">
+            <span className="search-icon">🔍</span>
+            <input
+              placeholder="Search transactions..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            {search && <button onClick={() => setSearch('')} className="clear-search">✕</button>}
+          </div>
+          <button className="export-btn" onClick={exportCSV} title="Export CSV">
+            ↓ Export
+          </button>
         </div>
         <div className="seg-control">
           {['all', 'expense', 'income'].map(f => (
@@ -69,7 +107,7 @@ export default function Transactions() {
               className={`seg-btn ${filter === f ? 'active' : ''}`}
               onClick={() => setFilter(f)}
             >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
+              {f === 'all' ? 'All' : f === 'expense' ? 'Expenses' : 'Income'}
             </button>
           ))}
         </div>
@@ -88,12 +126,7 @@ export default function Transactions() {
             <div key={date} className="date-group">
               <div className="date-label">{formatGroupDate(date)}</div>
               {grouped[date].map(tx => (
-                <TransactionItem
-                  key={tx.id}
-                  tx={tx}
-                  categories={categories}
-                  onClick={setEditTx}
-                />
+                <TransactionItem key={tx.id} tx={tx} categories={categories} onClick={setEditTx} />
               ))}
             </div>
           ))
@@ -115,9 +148,8 @@ function formatGroupDate(dateStr) {
   try {
     const d = new Date(dateStr + 'T12:00:00')
     const today = new Date()
-    const yesterday = new Date(today)
-    yesterday.setDate(today.getDate() - 1)
-    if (d.toDateString() === today.toDateString()) return 'Today'
+    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1)
+    if (d.toDateString() === today.toDateString())     return 'Today'
     if (d.toDateString() === yesterday.toDateString()) return 'Yesterday'
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
   } catch { return dateStr }
