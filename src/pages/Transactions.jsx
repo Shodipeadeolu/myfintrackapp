@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import { getTransactions } from '../firebase/service'
-import { fmtCurrency, toFirestoreDate } from '../utils/helpers'
+import { fmtCurrency, fmtCurrencyCompact, toFirestoreDate } from '../utils/helpers'
 import { startOfMonth, endOfMonth } from 'date-fns'
 import MonthNavigator from '../components/MonthNavigator'
 import TransactionItem from '../components/TransactionItem'
@@ -70,11 +70,11 @@ export default function Transactions() {
         </div>
         <div className="txns-stat-card income-bg">
           <div className="txns-stat-label">Total Income</div>
-          <div className="txns-stat-val income">+{fmt(totalIncome)}</div>
+          <div className="txns-stat-val income">+{fmtCurrencyCompact(totalIncome, currency)}</div>
         </div>
         <div className="txns-stat-card expense-bg">
           <div className="txns-stat-label">Total Expenses</div>
-          <div className="txns-stat-val expense">-{fmt(totalExpenses)}</div>
+          <div className="txns-stat-val expense">-{fmtCurrencyCompact(totalExpenses, currency)}</div>
         </div>
       </div>
 

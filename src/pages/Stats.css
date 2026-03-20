@@ -177,3 +177,42 @@
 .drill-sub-right { display: flex; align-items: center; gap: 8px; }
 .drill-sub-arrow { font-size: 18px; color: var(--text-muted); }
 .pct-badge { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
+
+/* Pie legend */
+.pie-legend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  padding: 12px 20px 4px;
+}
+
+.pie-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pie-legend-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pie-legend-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.pie-legend-pct {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}

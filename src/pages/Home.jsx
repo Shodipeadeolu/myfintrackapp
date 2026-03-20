@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import { getTransactions } from '../firebase/service'
-import { fmtCurrency, toFirestoreDate } from '../utils/helpers'
+import { fmtCurrency, fmtCurrencyCompact, toFirestoreDate } from '../utils/helpers'
 import { startOfMonth, endOfMonth, format } from 'date-fns'
 import MonthNavigator from '../components/MonthNavigator'
 import TransactionItem from '../components/TransactionItem'
@@ -87,17 +87,17 @@ export default function Home({ onNavigate }) {
           <div className="stat-card income-card">
             <div className="stat-card-icon income-icon">↗</div>
             <div className="stat-card-label">Income</div>
-            <div className="stat-card-value income-val">{fmt(income)}</div>
+            <div className="stat-card-value income-val">{fmtCurrencyCompact(income, currency)}</div>
           </div>
           <div className="stat-card expense-card">
             <div className="stat-card-icon expense-icon">↘</div>
             <div className="stat-card-label">Expenses</div>
-            <div className="stat-card-value expense-val">{fmt(expenses)}</div>
+            <div className="stat-card-value expense-val">{fmtCurrencyCompact(expenses, currency)}</div>
           </div>
           <div className="stat-card savings-card">
             <div className="stat-card-icon savings-icon">🐖</div>
             <div className="stat-card-label">Savings</div>
-            <div className="stat-card-value savings-val">{fmt(savings)}</div>
+            <div className="stat-card-value savings-val">{fmtCurrencyCompact(savings, currency)}</div>
           </div>
         </div>
 

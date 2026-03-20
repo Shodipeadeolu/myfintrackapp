@@ -133,11 +133,12 @@
 }
 
 .stat-card-value {
-  font-size: clamp(12px, 3.5vw, 15px);
+  font-size: clamp(14px, 4vw, 18px);
   font-weight: 800;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: -0.02em;
 }
 
 .income-val  { color: var(--green); }

@@ -141,29 +141,15 @@ export default function Stats() {
             {breakdown.length > 0 ? (
               <div className="stats-pie-section">
                 <div className="pie-container">
-                  <ResponsiveContainer width="100%" height={260}>
+                  <ResponsiveContainer width="100%" height={220}>
                     <PieChart>
                       <Pie
                         data={breakdown}
                         cx="50%" cy="50%"
-                        outerRadius={110}
-                        innerRadius={0}
-                        paddingAngle={1}
+                        outerRadius={95}
+                        innerRadius={40}
+                        paddingAngle={2}
                         dataKey="amount"
-                        label={({ name, pct, cx, cy, midAngle, outerRadius }) => {
-                          const RADIAN = Math.PI / 180
-                          const r = outerRadius + 22
-                          const x = cx + r * Math.cos(-midAngle * RADIAN)
-                          const y = cy + r * Math.sin(-midAngle * RADIAN)
-                          const shortName = name.length > 10 ? name.slice(0,10)+'…' : name
-                          return pct >= 3 ? (
-                            <text x={x} y={y} fill="#f0f4ff" textAnchor={x > cx ? 'start' : 'end'}
-                              dominantBaseline="central" fontSize={11} fontWeight={600}>
-                              {shortName}{'\n'}{pct}%
-                            </text>
-                          ) : null
-                        }}
-                        labelLine={{ stroke: 'rgba(240,244,255,0.3)', strokeWidth: 1 }}
                       >
                         {breakdown.map((_, i) => (
                           <Cell key={i} fill={COLORS[i % COLORS.length]} />
@@ -175,6 +161,16 @@ export default function Stats() {
                       />
                     </PieChart>
                   </ResponsiveContainer>
+                  {/* Pie legend — 2 column grid of badges */}
+                  <div className="pie-legend">
+                    {breakdown.slice(0, 8).map((cat, i) => (
+                      <div key={cat.name} className="pie-legend-item">
+                        <div className="pie-legend-dot" style={{ background: COLORS[i % COLORS.length] }} />
+                        <span className="pie-legend-name">{cat.name.length > 12 ? cat.name.slice(0,12)+'…' : cat.name}</span>
+                        <span className="pie-legend-pct">{cat.pct}%</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             ) : (

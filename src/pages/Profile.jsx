@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
+import { useAppUpdate } from '../hooks/useAppUpdate'
 import CategoryManager from '../components/CategoryManager'
 import HouseholdManager from '../components/HouseholdManager'
 import ImportSheet from '../components/ImportSheet'
 import CurrencyPicker from '../components/CurrencyPicker'
+import AppUpdateSheet from '../components/AppUpdateSheet'
 import './Profile.css'
 
 const CURRENCY_NAMES = {
@@ -16,6 +18,7 @@ const CURRENCY_NAMES = {
 
 export default function Profile({ initialTab }) {
   const { user, profile, household, userRole, logout, currency } = useApp()
+  const update = useAppUpdate()
   const [activeSheet, setActiveSheet] = useState(initialTab || null)
 
   const initials = (profile?.displayName || user?.email || 'U')
@@ -24,10 +27,39 @@ export default function Profile({ initialTab }) {
   const currencyLabel = CURRENCY_NAMES[currency] || currency
 
   const menuItems = [
-    { id: 'currency', icon: '💱', label: 'Currency', desc: `${currency} · ${currencyLabel}` },
-    { id: 'types',    icon: '⊞', label: 'Transaction Types', desc: 'Manage categories & subcategories' },
-    { id: 'household',icon: '🏠', label: 'Household', desc: household ? household.name : 'Create or join a household' },
-    { id: 'import',   icon: '📥', label: 'Import Transactions', desc: 'Upload an XLSX file' },
+    {
+      id: 'currency',
+      icon: '💱',
+      label: 'Currency',
+      desc: `${currency} · ${currencyLabel}`
+    },
+    {
+      id: 'types',
+      icon: '⊞',
+      label: 'Transaction Types',
+      desc: 'Manage categories & subcategories'
+    },
+    {
+      id: 'household',
+      icon: '🏠',
+      label: 'Household',
+      desc: household ? household.name : 'Create or join a household'
+    },
+    {
+      id: 'import',
+      icon: '📥',
+      label: 'Import Transactions',
+      desc: 'Upload an XLSX file'
+    },
+    {
+      id: 'update',
+      icon: '🔄',
+      label: 'App Update',
+      desc: update.updateAvailable
+        ? '🟢 Update available!'
+        : `v${update.version} · Last checked ${update.lastChecked}`,
+      badge: update.updateAvailable
+    },
   ]
 
   return (
@@ -52,7 +84,9 @@ export default function Profile({ initialTab }) {
               <div className="menu-icon-wrap">{item.icon}</div>
               <div className="menu-text">
                 <div className="menu-label">{item.label}</div>
-                <div className="menu-desc">{item.desc}</div>
+                <div className={`menu-desc ${item.badge ? 'menu-desc-accent' : ''}`}>
+                  {item.desc}
+                </div>
               </div>
               <span className="menu-arrow">›</span>
             </button>
@@ -70,7 +104,7 @@ export default function Profile({ initialTab }) {
 
         <div className="profile-footer">
           <p>FinTrack · Built with ♥</p>
-          <p>v2.1.0</p>
+          <p>v{update.version}</p>
         </div>
       </div>
 
@@ -78,6 +112,9 @@ export default function Profile({ initialTab }) {
       {activeSheet === 'types'     && <CategoryManager onClose={() => setActiveSheet(null)} />}
       {activeSheet === 'household' && <HouseholdManager onClose={() => setActiveSheet(null)} />}
       {activeSheet === 'import'    && <ImportSheet onClose={() => setActiveSheet(null)} />}
+      {activeSheet === 'update'    && (
+        <AppUpdateSheet onClose={() => setActiveSheet(null)} update={update} />
+      )}
     </div>
   )
 }
