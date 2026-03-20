@@ -170,7 +170,8 @@ function BudgetSheet({ budget, categories, existingCategories, onClose, onSaved,
 
   const availableCats = categories.filter(c => !existingCategories.includes(c.name) || c.name === budget?.category)
   const selectedCat   = categories.find(c => c.name === category)
-  const sym = new Intl.NumberFormat('en', { style: 'currency', currency: currency||'USD' }).format(0).replace(/[\d.,\s]/g,'').trim() || '$'
+  const SYMS = {NGN:'₦',USD:'$',EUR:'€',GBP:'£',GHS:'₵',KES:'KSh',ZAR:'R',EGP:'E£',AED:'AED',SAR:'SAR',CAD:'CA$',AUD:'A$',JPY:'¥',CNY:'¥',INR:'₹',BRL:'R$',MXN:'MX$',SGD:'S$',CHF:'CHF',HKD:'HK$',PHP:'₱',IDR:'Rp',MYR:'RM',THB:'฿',TRY:'₺',RUB:'₽',PLN:'zł',ILS:'₪',KRW:'₩',VND:'₫'}
+  const sym = SYMS[currency||'USD'] || (currency||'USD')
 
   const handleSave = async () => {
     if (!category) return setErr('Select a category')

@@ -104,10 +104,7 @@ export default function AddTransaction({ tx, onClose, onSaved }) {
           </div>
 
           <div className="amount-field">
-            <span className="currency-sym">
-              {new Intl.NumberFormat('en', { style: 'currency', currency: currency || 'USD' })
-                .format(0).replace(/[\d.,\s]/g, '').trim() || '$'}
-            </span>
+            <span className="currency-sym">{getSym(currency || 'USD')}</span>
             <input
               type="number" inputMode="decimal" placeholder="0.00"
               value={amount} onChange={e => setAmount(e.target.value)}

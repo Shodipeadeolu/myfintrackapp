@@ -3,8 +3,30 @@ import * as XLSX from 'xlsx'
 import SparkMD5 from 'spark-md5'
 
 // ─── Formatting ───────────────────────────────────────────────
-export const fmtCurrency = (n, currency = 'USD') =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 2 }).format(n || 0)
+// Currency symbol map — ensures correct symbols are used (e.g. ₦ not NGN)
+const CURRENCY_SYMBOLS = {
+  NGN: '₦', USD: '$', EUR: '€', GBP: '£', GHS: '₵',
+  KES: 'KSh', ZAR: 'R', EGP: 'E£', UGX: 'USh', TZS: 'TSh',
+  ETB: 'Br', XOF: 'CFA', MAD: 'MAD', CAD: 'CA$', AUD: 'A$',
+  JPY: '¥', CNY: '¥', INR: '₹', AED: 'AED', SAR: 'SAR',
+  BRL: 'R$', MXN: 'MX$', SGD: 'S$', CHF: 'CHF', NOK: 'kr',
+  SEK: 'kr', DKK: 'kr', NZD: 'NZ$', HKD: 'HK$', PKR: '₨',
+  BDT: '৳', PHP: '₱', IDR: 'Rp', MYR: 'RM', THB: '฿',
+  TRY: '₺', RUB: '₽', PLN: 'zł', CZK: 'Kč', HUF: 'Ft',
+  ILS: '₪', CLP: 'CLP', COP: 'COP', PEN: 'S/', ARS: 'ARS',
+  VND: '₫', KRW: '₩',
+}
+
+const getCurrencySymbol = (currency = 'USD') =>
+  CURRENCY_SYMBOLS[currency] || currency
+
+export const fmtCurrency = (n, currency = 'USD') => {
+  const sym = getCurrencySymbol(currency)
+  const abs = Math.abs(n || 0)
+  const sign = (n || 0) < 0 ? '-' : ''
+  const formatted = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(abs)
+  return `${sign}${sym}${formatted}`
+}
 
 export const fmtDate = (dateStr) => {
   try { return format(new Date(dateStr), 'd MMM yyyy') } catch { return dateStr }
@@ -202,3 +224,15 @@ export const ROLES = [
   { value: 'record-edit', label: 'Record & Edit', desc: 'Add and edit transactions only' },
   { value: 'view-only', label: 'View Only', desc: 'Read-only access' },
 ]
+
+// Compact formatter for tight spaces — abbreviates large numbers
+// e.g. NGN 976,199 → NGN 976K, NGN 1,500,000 → NGN 1.5M
+export const fmtCurrencyCompact = (n, currency = 'USD') => {
+  const abs = Math.abs(n || 0)
+  const sign = (n || 0) < 0 ? '-' : ''
+  const sym = getCurrencySymbol(currency)
+
+  if (abs >= 1_000_000) return `${sign}${sym}${(abs / 1_000_000).toFixed(1)}M`
+  if (abs >= 1_000)     return `${sign}${sym}${(abs / 1_000).toFixed(0)}K`
+  return `${sign}${sym}${abs.toFixed(2)}`
+}
