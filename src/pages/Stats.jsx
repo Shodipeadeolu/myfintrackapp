@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import { getTransactions } from '../firebase/service'
-import { groupByCategory, get6MonthTrend, fmtCurrency, toFirestoreDate } from '../utils/helpers'
+import { groupByCategory, fmtCurrency, toFirestoreDate } from '../utils/helpers'
 import { startOfMonth, endOfMonth, startOfYear, endOfYear, startOfWeek, endOfWeek, format } from 'date-fns'
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import MonthNavigator from '../components/MonthNavigator'
 import TransactionItem from '../components/TransactionItem'
 import AddTransaction from '../components/AddTransaction'
@@ -11,17 +10,125 @@ import './Stats.css'
 
 const PERIOD_OPTIONS = ['Weekly', 'Monthly', 'Annually', 'Custom']
 
-// Vibrant palette matching reference screenshot
 const COLORS = [
   '#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#ff922b',
-  '#cc5de8','#20c997','#f06595','#74c0fc','#a9e34b'
+  '#cc5de8','#20c997','#f06595','#74c0fc','#a9e34b',
+  '#f783ac','#38d9a9','#a9e34b','#ff8787'
 ]
 
-// Gradient color stops for percent badge
-const BADGE_COLORS = [
-  '#ef4444','#f97316','#eab308','#84cc16','#22c55e',
-  '#06b6d4','#3b82f6','#8b5cf6','#ec4899','#14b8a6'
-]
+// Badge colour gradient: high% = red, low% = green
+const badgeColor = (pct) => {
+  if (pct >= 25) return '#ef4444'
+  if (pct >= 18) return '#f97316'
+  if (pct >= 12) return '#eab308'
+  if (pct >= 7)  return '#84cc16'
+  if (pct >= 4)  return '#22c55e'
+  return '#06b6d4'
+}
+
+// ── Custom pie chart with external labels + leader lines ──────
+function PieWithLabels({ data, colors, size = 300 }) {
+  const cx = size / 2
+  const cy = size / 2
+  const R  = size * 0.30   // outer radius
+  const Ri = size * 0.13   // inner radius (donut hole)
+  const LABEL_R = size * 0.44  // where label text sits
+
+  // Convert data to slices
+  const total = data.reduce((s, d) => s + d.amount, 0)
+  let startAngle = -Math.PI / 2  // start at top
+
+  const slices = data.map((d, i) => {
+    const pct    = d.amount / total
+    const angle  = pct * 2 * Math.PI
+    const end    = startAngle + angle
+    const mid    = startAngle + angle / 2
+
+    // Arc path
+    const x1 = cx + R * Math.cos(startAngle)
+    const y1 = cy + R * Math.sin(startAngle)
+    const x2 = cx + R * Math.cos(end)
+    const y2 = cy + R * Math.sin(end)
+    const xi1 = cx + Ri * Math.cos(startAngle)
+    const yi1 = cy + Ri * Math.sin(startAngle)
+    const xi2 = cx + Ri * Math.cos(end)
+    const yi2 = cy + Ri * Math.sin(end)
+    const large = angle > Math.PI ? 1 : 0
+
+    const path = [
+      `M ${xi1} ${yi1}`,
+      `A ${Ri} ${Ri} 0 ${large} 1 ${xi2} ${yi2}`,
+      `L ${x2} ${y2}`,
+      `A ${R}  ${R}  0 ${large} 0 ${x1} ${y1}`,
+      'Z'
+    ].join(' ')
+
+    // Leader line: start at slice midpoint on outer edge, elbow, then text
+    const lx1 = cx + (R + 4) * Math.cos(mid)
+    const ly1 = cy + (R + 4) * Math.sin(mid)
+    const lx2 = cx + LABEL_R * Math.cos(mid)
+    const ly2 = cy + LABEL_R * Math.sin(mid)
+    // Horizontal elbow
+    const elbowLen = 14
+    const lx3 = lx2 + (lx2 > cx ? elbowLen : -elbowLen)
+    const ly3 = ly2
+    const anchor = lx2 > cx ? 'start' : 'end'
+
+    // Short label
+    const name = d.name.length > 9 ? d.name.slice(0, 9) + '…' : d.name
+    const label = `${name}`
+    const pctLabel = `${Math.round(d.pct)} %`
+
+    const show = d.pct >= 2  // hide label if slice too small
+
+    const slice = { path, color: colors[i % colors.length], mid, lx1, ly1, lx2, ly2, lx3, ly3, anchor, label, pctLabel, show, pct: d.pct }
+    startAngle = end
+    return slice
+  })
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ overflow: 'visible' }}>
+      {/* Slices */}
+      {slices.map((s, i) => (
+        <path key={i} d={s.path} fill={s.color} stroke="#0d0f14" strokeWidth={1.5} />
+      ))}
+      {/* Leader lines + labels */}
+      {slices.map((s, i) => s.show && (
+        <g key={`label-${i}`}>
+          <polyline
+            points={`${s.lx1},${s.ly1} ${s.lx2},${s.ly2} ${s.lx3},${s.ly3}`}
+            fill="none"
+            stroke={s.color}
+            strokeWidth={1}
+            opacity={0.7}
+          />
+          <text
+            x={s.lx3 + (s.anchor === 'start' ? 3 : -3)}
+            y={s.ly3 - 6}
+            fill="#f0f4ff"
+            fontSize={10}
+            fontWeight={600}
+            textAnchor={s.anchor}
+            fontFamily="Plus Jakarta Sans, sans-serif"
+          >
+            {s.label}
+          </text>
+          <text
+            x={s.lx3 + (s.anchor === 'start' ? 3 : -3)}
+            y={s.ly3 + 7}
+            fill={s.color}
+            fontSize={10}
+            fontWeight={700}
+            textAnchor={s.anchor}
+            fontFamily="Plus Jakarta Sans, sans-serif"
+          >
+            {s.pctLabel}
+          </text>
+        </g>
+      ))}
+    </svg>
+  )
+}
 
 export default function Stats() {
   const { user, householdId, categories, reloadTrigger, currency } = useApp()
@@ -61,8 +168,9 @@ export default function Stats() {
   }
 
   const fmt = n => fmtCurrency(n, currency)
-  const breakdown = groupByCategory(transactions, txType)
-  const total     = transactions.filter(t => t.type === txType).reduce((a, t) => a + t.amount, 0)
+  const breakdown  = groupByCategory(transactions, txType)
+  const incomeTotal  = transactions.filter(t => t.type === 'income').reduce((a,t) => a+t.amount, 0)
+  const expenseTotal = transactions.filter(t => t.type === 'expense').reduce((a,t) => a+t.amount, 0)
 
   const catTxs = drillCat ? transactions.filter(t => t.type === txType && t.category === drillCat) : []
 
@@ -80,19 +188,15 @@ export default function Stats() {
     : []
 
   const periodLabel = () => {
-    if (period === 'Weekly') return `Week of ${format(startOfWeek(anchor,{weekStartsOn:1}),'MMM d')}`
+    if (period === 'Weekly')   return `Week of ${format(startOfWeek(anchor,{weekStartsOn:1}),'MMM d')}`
     if (period === 'Annually') return format(anchor,'yyyy')
     if (period === 'Monthly')  return format(anchor,'MMMM yyyy')
     return `${customStart} → ${customEnd}`
   }
 
-  // Income / Expense tab label with total
-  const incomeTotal  = transactions.filter(t => t.type === 'income').reduce((a,t) => a+t.amount, 0)
-  const expenseTotal = transactions.filter(t => t.type === 'expense').reduce((a,t) => a+t.amount, 0)
-
   return (
     <div className="screen stats-screen">
-      {/* Header */}
+      {/* Period tabs */}
       <div className="stats-header">
         <div className="stats-period-tabs">
           {PERIOD_OPTIONS.map(p => (
@@ -114,7 +218,7 @@ export default function Stats() {
         </div>
       </div>
 
-      {/* Income / Expense toggle with totals */}
+      {/* Income / Expense tabs */}
       <div className="stats-type-tabs">
         <button
           className={`stats-type-tab ${txType === 'income' ? 'active' : ''}`}
@@ -135,79 +239,46 @@ export default function Stats() {
       <div className="scroll-area">
         {loading ? (
           <div className="load-row"><span className="spinner" /></div>
+        ) : breakdown.length === 0 ? (
+          <div className="empty-state" style={{ marginTop: 40 }}>
+            <span className="icon">📊</span>
+            <p>No {txType} data for {periodLabel()}.</p>
+          </div>
         ) : (
           <>
-            {/* Pie chart section */}
-            {breakdown.length > 0 ? (
-              <div className="stats-pie-section">
-                <div className="pie-container">
-                  <ResponsiveContainer width="100%" height={220}>
-                    <PieChart>
-                      <Pie
-                        data={breakdown}
-                        cx="50%" cy="50%"
-                        outerRadius={95}
-                        innerRadius={40}
-                        paddingAngle={2}
-                        dataKey="amount"
-                      >
-                        {breakdown.map((_, i) => (
-                          <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={v => fmt(v)}
-                        contentStyle={{ background: '#1e2535', border: '1px solid #2a3347', borderRadius: 10, fontSize: 12, color: '#f0f4ff' }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  {/* Pie legend — 2 column grid of badges */}
-                  <div className="pie-legend">
-                    {breakdown.slice(0, 8).map((cat, i) => (
-                      <div key={cat.name} className="pie-legend-item">
-                        <div className="pie-legend-dot" style={{ background: COLORS[i % COLORS.length] }} />
-                        <span className="pie-legend-name">{cat.name.length > 12 ? cat.name.slice(0,12)+'…' : cat.name}</span>
-                        <span className="pie-legend-pct">{cat.pct}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+            {/* Pie chart with external labels */}
+            <div className="stats-pie-section">
+              <div className="pie-svg-wrap">
+                <PieWithLabels data={breakdown} colors={COLORS} size={320} />
               </div>
-            ) : (
-              <div className="empty-state" style={{ marginTop: 40 }}>
-                <span className="icon">📊</span>
-                <p>No {txType} data for {periodLabel()}.</p>
-              </div>
-            )}
+            </div>
 
-            {/* Top Categories list */}
-            {breakdown.length > 0 && (
-              <div className="stats-cat-section">
-                <div className="stats-cat-title">Top Categories</div>
-                {breakdown.map((cat, i) => (
+            {/* Category list — badge + name + amount, separated by dividers */}
+            <div className="stats-cat-list">
+              {breakdown.map((cat, i) => {
+                const catDef = categories.find(c => c.name === cat.name)
+                const icon   = catDef?.icon || ''
+                return (
                   <button
                     key={cat.name}
-                    className="stats-cat-row"
+                    className="stats-cat-item"
                     onClick={() => { setDrillCat(cat.name); setDrillSub(null) }}
                   >
-                    <div className="scr-left">
-                      <div className="scr-dot" style={{ background: COLORS[i % COLORS.length] }} />
-                      <div className="scr-info">
-                        <div className="scr-name">{cat.name}</div>
-                        <div className="scr-amount">{fmt(cat.amount)}</div>
-                        <div className="scr-bar-track">
-                          <div className="scr-bar-fill" style={{ width: `${cat.pct}%`, background: COLORS[i % COLORS.length] }} />
-                        </div>
-                      </div>
+                    <div
+                      className="stats-pct-badge"
+                      style={{ background: badgeColor(cat.pct) }}
+                    >
+                      {cat.pct}%
                     </div>
-                    <div className="scr-right">
-                      <div className="scr-amount-big">{fmt(cat.amount)}</div>
-                      <div className="scr-pct">{cat.pct}%</div>
+                    <div className="stats-cat-name">
+                      {icon && <span className="stats-cat-icon">{icon}</span>}
+                      {cat.name}
                     </div>
+                    <div className="stats-cat-amount">{fmt(cat.amount)}</div>
                   </button>
-                ))}
-              </div>
-            )}
+                )
+              })}
+            </div>
           </>
         )}
       </div>
