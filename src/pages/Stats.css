@@ -8,8 +8,8 @@
   border-radius: var(--radius-sm); padding: 3px; gap: 2px; margin-bottom: 12px;
 }
 .stats-period-tab {
-  flex: 1; padding: 7px 10px; border-radius: 7px;
-  font-size: 12px; font-weight: 600; color: var(--text-secondary);
+  flex: 1; padding: 7px 8px; border-radius: 7px;
+  font-size: 11px; font-weight: 600; color: var(--text-secondary);
   transition: all var(--transition);
 }
 .stats-period-tab.active {
@@ -36,78 +36,63 @@
   font-size: 14px; font-weight: 600; color: var(--text-muted);
   border-bottom: 2px solid transparent; margin-bottom: -1px;
   transition: all var(--transition); justify-content: center;
+  white-space: nowrap; overflow: hidden;
 }
-.stats-type-tab.active { color: var(--text-primary); border-bottom-color: var(--green); }
+.stats-type-tab.active       { color: var(--text-primary); border-bottom-color: var(--green); }
 .stats-type-tab.active.expense { border-bottom-color: var(--accent); }
 .stt-label { font-size: 14px; font-weight: 600; }
-.stt-total { font-size: 16px; font-weight: 800; }
-.stats-type-tab.active .stt-total { color: var(--green); }
+.stt-total {
+  font-size: clamp(12px, 3.5vw, 16px);
+  font-weight: 800;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.stats-type-tab.active         .stt-total { color: var(--green); }
 .stats-type-tab.active.expense .stt-total { color: var(--accent); }
 
-/* Pie chart */
+/* Pie */
 .stats-pie-section {
-  display: flex; justify-content: center;
-  padding: 20px 0 8px;
+  padding: 16px 12px 4px;
+  /* Clip so labels don't bleed outside the page */
+  overflow: hidden;
 }
 
-.pie-svg-wrap {
-  /* Give room for external labels */
-  width: 100%;
-  max-width: 360px;
-  padding: 0 30px;
-  overflow: visible;
-}
-
-/* Category list — clean rows like reference */
-.stats-cat-list {
-  padding: 8px 20px 32px;
-}
+/* Category list */
+.stats-cat-list { padding: 8px 20px 32px; }
 
 .stats-cat-item {
   width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 0;
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 0;
   border-bottom: 1px solid var(--border);
-  text-align: left;
-  transition: opacity var(--transition);
+  text-align: left; transition: opacity var(--transition);
 }
 .stats-cat-item:last-child { border-bottom: none; }
 .stats-cat-item:active { opacity: 0.6; }
 
-/* Coloured percentage badge */
 .stats-pct-badge {
-  min-width: 48px;
-  height: 28px;
+  min-width: 50px; height: 30px;
   border-radius: 8px;
   display: flex; align-items: center; justify-content: center;
   font-size: 13px; font-weight: 800;
-  color: #fff;
-  flex-shrink: 0;
-  letter-spacing: -0.02em;
+  color: #fff; flex-shrink: 0;
 }
 
-/* Category name + icon */
 .stats-cat-name {
-  flex: 1;
-  font-size: 15px; font-weight: 600;
-  color: var(--text-primary);
-  display: flex; align-items: center; gap: 6px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex: 1; display: flex; align-items: center; gap: 6px;
   min-width: 0;
 }
-
 .stats-cat-icon { font-size: 16px; flex-shrink: 0; }
+.stats-cat-text {
+  font-size: 15px; font-weight: 600; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
-/* Amount on right */
 .stats-cat-amount {
-  font-size: 15px; font-weight: 700;
-  color: var(--text-primary);
+  font-size: 14px; font-weight: 700; color: var(--text-primary);
   white-space: nowrap; flex-shrink: 0;
 }
 
-/* Drill-down sheet styles */
+/* Drill sheets */
 .drill-total { font-size: 13px; color: var(--text-muted); font-weight: 600; margin-bottom: 16px; }
 
 .drill-all-btn {
@@ -123,8 +108,10 @@
 }
 
 .drill-sub-list { display: flex; flex-direction: column; gap: 8px; }
-.drill-sub-title { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
-
+.drill-sub-title {
+  font-size: 11px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px;
+}
 .drill-sub-row {
   width: 100%; display: flex; align-items: center; justify-content: space-between;
   padding: 12px 14px; background: var(--bg-card);
@@ -132,10 +119,10 @@
   transition: transform var(--transition);
 }
 .drill-sub-row:active { transform: scale(0.98); }
-.drill-sub-left { display: flex; align-items: center; gap: 10px; }
-.drill-sub-dot  { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-.drill-sub-name { font-size: 14px; font-weight: 600; color: var(--text-primary); text-align: left; }
-.drill-sub-amt  { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.drill-sub-left  { display: flex; align-items: center; gap: 10px; }
+.drill-sub-dot   { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.drill-sub-name  { font-size: 14px; font-weight: 600; color: var(--text-primary); text-align: left; }
+.drill-sub-amt   { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 .drill-sub-right { display: flex; align-items: center; gap: 8px; }
 .drill-sub-arrow { font-size: 18px; color: var(--text-muted); }
 .pct-badge { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
