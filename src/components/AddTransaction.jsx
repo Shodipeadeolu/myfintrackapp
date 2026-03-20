@@ -1,27 +1,36 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import { addTransaction, updateTransaction, deleteTransaction } from '../firebase/service'
-import { toFirestoreDate } from '../utils/helpers'
+import { toFirestoreDate, fmtCurrency } from '../utils/helpers'
 import CategoryPicker from './CategoryPicker'
 import Toast from './Toast'
 import './AddTransaction.css'
+
+const CURRENCY_SYMBOLS = {
+  NGN:'₦', USD:'$', EUR:'€', GBP:'£', GHS:'₵', KES:'KSh', ZAR:'R',
+  EGP:'E£', AED:'AED', SAR:'SAR', CAD:'CA$', AUD:'A$', JPY:'¥', CNY:'¥',
+  INR:'₹', BRL:'R$', MXN:'MX$', SGD:'S$', CHF:'CHF', HKD:'HK$', PHP:'₱',
+  IDR:'Rp', MYR:'RM', THB:'฿', TRY:'₺', RUB:'₽', PLN:'zł', ILS:'₪',
+  KRW:'₩', VND:'₫',
+}
+const getSym = (c) => CURRENCY_SYMBOLS[c] || c
 
 export default function AddTransaction({ tx, onClose, onSaved }) {
   const { user, householdId, categories, canWrite, currency } = useApp()
   const editing = !!tx
 
-  const [type, setType]             = useState(tx?.type || 'expense')
-  const [amount, setAmount]         = useState(tx?.amount ? String(tx.amount) : '')
-  const [category, setCategory]     = useState(tx?.category || '')
+  const [type, setType]           = useState(tx?.type || 'expense')
+  const [amount, setAmount]       = useState(tx?.amount ? String(tx.amount) : '')
+  const [category, setCategory]   = useState(tx?.category || '')
   const [subcategory, setSubcategory] = useState(tx?.subcategory || '')
-  const [date, setDate]             = useState(tx?.date || toFirestoreDate(new Date()))
-  const [note, setNote]             = useState(tx?.note || '')
-  const [saving, setSaving]         = useState(false)
-  const [deleting, setDeleting]     = useState(false)
+  const [date, setDate]           = useState(tx?.date || toFirestoreDate(new Date()))
+  const [note, setNote]           = useState(tx?.note || '')
+  const [saving, setSaving]       = useState(false)
+  const [deleting, setDeleting]   = useState(false)
   const [showCatPicker, setShowCatPicker] = useState(false)
   const [showSubPicker, setShowSubPicker] = useState(false)
-  const [err, setErr]               = useState('')
-  const [toast, setToast]           = useState(null)
+  const [err, setErr]             = useState('')
+  const [toast, setToast]         = useState(null)
 
   const filteredCats = categories.filter(c => c.type === type)
   const selectedCat  = categories.find(c => c.name === category)
@@ -33,26 +42,20 @@ export default function AddTransaction({ tx, onClose, onSaved }) {
     setCategory(cat.name); setSubcategory(''); setShowCatPicker(false)
   }
 
-  const showToast = (msg, type = 'success') => {
-    setToast({ msg, type })
-  }
-
   const handleSave = async () => {
     if (!amount || isNaN(parseFloat(amount))) return setErr('Enter a valid amount')
     if (!category) return setErr('Pick a category')
     if (!date) return setErr('Pick a date')
-    setErr('')
-    setSaving(true)
+    setErr(''); setSaving(true)
     try {
       const data = { type, amount: parseFloat(amount), category, subcategory, date, note: note.trim() }
       if (editing) {
         await updateTransaction(tx.id, data)
-        showToast('Transaction updated')
+        setToast({ msg: 'Transaction updated', type: 'success' })
       } else {
         await addTransaction(user.uid, householdId, data)
-        showToast('Transaction saved!')
+        setToast({ msg: 'Transaction saved!', type: 'success' })
       }
-      // Small delay so toast is visible before sheet closes
       setTimeout(() => onSaved(), 800)
     } catch (e) {
       setErr('Save failed. Try again.')
@@ -159,7 +162,8 @@ export default function AddTransaction({ tx, onClose, onSaved }) {
       {showCatPicker && (
         <CategoryPicker
           categories={filteredCats} selected={category}
-          onSelect={handleCatSelect} onClose={() => setShowCatPicker(false)}
+          onSelect={handleCatSelect}
+          onClose={() => setShowCatPicker(false)}
           title="Pick Category"
         />
       )}
