@@ -13,7 +13,7 @@ import './styles/global.css'
 import './App.css'
 
 export default function App() {
-  const { user, authLoading } = useApp()
+  const { user, authLoading, triggerReload } = useApp()
   const [tab, setTab] = useState('home')
   const [profileTab, setProfileTab] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
@@ -50,9 +50,10 @@ export default function App() {
   if (authLoading) {
     return (
       <div className="splash">
-        <div className="splash-logo">💸</div>
+        <div className="splash-logo-wrap">💸</div>
         <div className="splash-name">FinTrack</div>
-        <div className="spinner" style={{ marginTop: 24 }} />
+        <div className="splash-tagline">Your personal finance, sorted.</div>
+        <div className="spinner" style={{ marginTop: 8 }} />
       </div>
     )
   }
@@ -80,7 +81,7 @@ export default function App() {
         <AddTransaction
           key={addKey}
           onClose={() => setShowAdd(false)}
-          onSaved={() => setShowAdd(false)}
+          onSaved={() => { setShowAdd(false); triggerReload() }}
         />
       )}
     </div>

@@ -18,6 +18,9 @@ export function AppProvider({ children }) {
   const [reloadTrigger, setReloadTrigger] = useState(0)
   const [theme, setTheme]             = useState(() => localStorage.getItem('ft-theme') || 'dark')
   const [currency, setCurrencyState]  = useState(() => localStorage.getItem('ft-currency') || 'USD')
+  const [balanceRollover, setBalanceRolloverState] = useState(
+    () => localStorage.getItem('ft-balance-rollover') === 'true'
+  )
   const [categories, setCategories]   = useState([])
   const [household, setHousehold]     = useState(null)
   const [pendingInvites, setPendingInvites] = useState([])
@@ -34,6 +37,12 @@ export function AppProvider({ children }) {
     setCurrencyState(code)
     localStorage.setItem('ft-currency', code)
     if (uid) await setUserProfile(uid, { currency: code })
+  }
+
+  const setBalanceRollover = async (val) => {
+    setBalanceRolloverState(val)
+    localStorage.setItem('ft-balance-rollover', val ? 'true' : 'false')
+    if (user) await setUserProfile(user.uid, { balanceRollover: val })
   }
 
   // Auth
@@ -62,6 +71,11 @@ export function AppProvider({ children }) {
       if (prof.currency) {
         setCurrencyState(prof.currency)
         localStorage.setItem('ft-currency', prof.currency)
+      }
+      // Load balance rollover setting from profile
+      if (prof.balanceRollover !== undefined) {
+        setBalanceRolloverState(prof.balanceRollover)
+        localStorage.setItem('ft-balance-rollover', prof.balanceRollover ? 'true' : 'false')
       }
 
       const hhId = overrideHouseholdId !== undefined
@@ -129,6 +143,8 @@ export function AppProvider({ children }) {
       theme, toggleTheme,
       currency,
       setCurrency: (code) => setCurrency(code, user?.uid),
+      balanceRollover,
+      setBalanceRollover,
       categories, setCategories, refreshCategories,
       household, householdId, userRole, canWrite, refreshHousehold,
       pendingInvites, handleAcceptInvite,

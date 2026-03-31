@@ -17,7 +17,7 @@ const CURRENCY_NAMES = {
 }
 
 export default function Profile({ initialTab }) {
-  const { user, profile, household, userRole, logout, currency } = useApp()
+  const { user, profile, household, userRole, logout, currency, balanceRollover, setBalanceRollover } = useApp()
   const update = useAppUpdate()
   const [activeSheet, setActiveSheet] = useState(initialTab || null)
 
@@ -52,6 +52,14 @@ export default function Profile({ initialTab }) {
       desc: 'Upload an XLSX file'
     },
     {
+      id: 'rollover',
+      icon: '🔄',
+      label: 'Balance Rollover',
+      desc: balanceRollover ? 'On — closing balance carries forward' : 'Off — each month starts fresh',
+      toggle: true,
+      toggleValue: balanceRollover,
+    },
+    {
       id: 'update',
       icon: '🔄',
       label: 'App Update',
@@ -80,16 +88,32 @@ export default function Profile({ initialTab }) {
 
         <div className="menu-section">
           {menuItems.map(item => (
-            <button key={item.id} className="menu-row" onClick={() => setActiveSheet(item.id)}>
-              <div className="menu-icon-wrap">{item.icon}</div>
-              <div className="menu-text">
-                <div className="menu-label">{item.label}</div>
-                <div className={`menu-desc ${item.badge ? 'menu-desc-accent' : ''}`}>
-                  {item.desc}
+            item.toggle ? (
+              <div key={item.id} className="menu-row">
+                <div className="menu-icon-wrap">{item.icon}</div>
+                <div className="menu-text">
+                  <div className="menu-label">{item.label}</div>
+                  <div className="menu-desc">{item.desc}</div>
                 </div>
+                <button
+                  className={`profile-toggle ${item.toggleValue ? 'on' : 'off'}`}
+                  onClick={() => setBalanceRollover(!item.toggleValue)}
+                >
+                  <div className="profile-toggle-knob" />
+                </button>
               </div>
-              <span className="menu-arrow">›</span>
-            </button>
+            ) : (
+              <button key={item.id} className="menu-row" onClick={() => setActiveSheet(item.id)}>
+                <div className="menu-icon-wrap">{item.icon}</div>
+                <div className="menu-text">
+                  <div className="menu-label">{item.label}</div>
+                  <div className={`menu-desc ${item.badge ? 'menu-desc-accent' : ''}`}>
+                    {item.desc}
+                  </div>
+                </div>
+                <span className="menu-arrow">›</span>
+              </button>
+            )
           ))}
         </div>
 

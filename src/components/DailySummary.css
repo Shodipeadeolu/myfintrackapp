@@ -1,0 +1,248 @@
+.daily-summary-wrap {
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Daily Card ─────────────────────────────────────────────── */
+.daily-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+.daily-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.daily-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.daily-card-date {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* Stats row */
+.daily-stats-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  margin-bottom: 16px;
+}
+
+.daily-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.daily-stat-divider {
+  width: 1px;
+  height: 44px;
+  background: var(--border);
+  margin: 0 12px;
+  flex-shrink: 0;
+}
+
+.daily-stat-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.daily-stat-value {
+  font-size: clamp(15px, 4vw, 19px);
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.daily-stat-value.expense { color: var(--accent); }
+.daily-stat-value.good    { color: var(--green); }
+.daily-stat-value.warn    { color: var(--amber); }
+.daily-stat-value.neutral { color: var(--text-primary); }
+
+.daily-stat-change {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.daily-stat-change.good    { color: var(--green); }
+.daily-stat-change.bad     { color: var(--accent); }
+.daily-stat-change.neutral { color: var(--text-muted); }
+
+/* Monthly pace bar */
+.daily-pace { }
+
+.daily-pace-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.daily-pace-track {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  background: var(--bg-elevated);
+  border-radius: 4px;
+  overflow: visible;
+  margin-bottom: 6px;
+}
+
+.daily-pace-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+.daily-pace-fill.good   { background: var(--green); }
+.daily-pace-fill.warn   { background: var(--amber); }
+.daily-pace-fill.danger { background: var(--accent); }
+
+/* Month progress marker (vertical line) */
+.daily-pace-month-marker {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 14px;
+  background: var(--text-muted);
+  border-radius: 1px;
+  transform: translateX(-50%);
+  z-index: 2;
+}
+
+.daily-pace-legend {
+  display: flex;
+  gap: 14px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.pace-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pace-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.pace-dot.spend  { background: var(--green); }
+.pace-dot.marker { background: var(--text-muted); border-radius: 2px; }
+
+/* ── Alert Banners ──────────────────────────────────────────── */
+.alerts-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.alerts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+
+.alerts-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.alerts-dismiss {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.alert-banner {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  text-align: left;
+  transition: opacity var(--transition);
+}
+.alert-banner:active { opacity: 0.7; }
+
+.alert-banner.danger  { background: rgba(239,68,68,0.12);   border: 1px solid rgba(239,68,68,0.25); }
+.alert-banner.warn    { background: rgba(245,166,35,0.12);  border: 1px solid rgba(245,166,35,0.25); }
+.alert-banner.caution { background: rgba(234,179,8,0.10);   border: 1px solid rgba(234,179,8,0.2); }
+
+.alert-banner-left { flex: 1; min-width: 0; }
+
+.alert-banner-cat {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.alert-banner-msg {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.alert-banner-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.alert-pct {
+  font-size: 14px;
+  font-weight: 800;
+}
+.alert-banner.danger  .alert-pct { color: var(--red, #ef4444); }
+.alert-banner.warn    .alert-pct { color: var(--amber); }
+.alert-banner.caution .alert-pct { color: var(--amber); }
+
+.alert-bar-track {
+  width: 72px;
+  height: 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.alert-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.alert-banner.warn    .alert-bar-fill { background: var(--amber); }
+.alert-banner.caution .alert-bar-fill { background: var(--amber); }

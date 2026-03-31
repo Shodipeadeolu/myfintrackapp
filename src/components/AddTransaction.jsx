@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import { addTransaction, updateTransaction, deleteTransaction } from '../firebase/service'
 import { toFirestoreDate, fmtCurrency } from '../utils/helpers'
@@ -36,7 +36,16 @@ export default function AddTransaction({ tx, onClose, onSaved }) {
   const selectedCat  = categories.find(c => c.name === category)
   const subcats      = selectedCat?.subcategories || []
 
-  useEffect(() => { setCategory(''); setSubcategory('') }, [type])
+  // Only clear category/subcategory when user actively toggles the type
+  // Use a ref to skip the initial mount firing
+  const prevType = useRef(type)
+  useEffect(() => {
+    if (prevType.current !== type) {
+      setCategory('')
+      setSubcategory('')
+    }
+    prevType.current = type
+  }, [type])
 
   const handleCatSelect = (cat) => {
     setCategory(cat.name); setSubcategory(''); setShowCatPicker(false)

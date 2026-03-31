@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import { getTransactions } from '../firebase/service'
 import { fmtCurrency, fmtCurrencyCompact, toFirestoreDate } from '../utils/helpers'
@@ -7,42 +7,54 @@ import MonthNavigator from '../components/MonthNavigator'
 import TransactionItem from '../components/TransactionItem'
 import AddTransaction from '../components/AddTransaction'
 import InviteBanner from '../components/InviteBanner'
+import DailySummary from '../components/DailySummary'
 import './Home.css'
 
 export default function Home({ onNavigate }) {
-  const { user, profile, householdId, categories, pendingInvites, handleAcceptInvite, theme, toggleTheme, household, dataLoading, reloadTrigger, currency } = useApp()
+  const { user, profile, householdId, categories, pendingInvites, handleAcceptInvite, theme, toggleTheme, household, dataLoading, reloadTrigger, currency, balanceRollover } = useApp()
   const [month, setMonth]           = useState(new Date())
   const [transactions, setTransactions] = useState([])
+  const [prevBalance, setPrevBalance]   = useState(0)
   const [loading, setLoading]       = useState(false)
   const [showAdd, setShowAdd]       = useState(false)
   const [editTx, setEditTx]         = useState(null)
-  const prevHouseholdId             = useRef(undefined)
 
   useEffect(() => {
     if (!user) return
-    if (prevHouseholdId.current === householdId) return
-    prevHouseholdId.current = householdId
     load()
-  }, [householdId, user])
-
-  useEffect(() => { if (!user) return; load() }, [month, reloadTrigger])
+  }, [month, householdId, reloadTrigger])
 
   const load = async () => {
     if (!user) return
     setLoading(true)
     try {
-      const txs = await getTransactions(user.uid, householdId,
-        toFirestoreDate(startOfMonth(month)),
-        toFirestoreDate(endOfMonth(month))
-      )
+      const [txs, prevTxs] = await Promise.all([
+        getTransactions(user.uid, householdId,
+          toFirestoreDate(startOfMonth(month)),
+          toFirestoreDate(endOfMonth(month))
+        ),
+        // If rollover is on, fetch all transactions before this month
+        balanceRollover
+          ? getTransactions(user.uid, householdId,
+              '2000-01-01',
+              toFirestoreDate(new Date(month.getFullYear(), month.getMonth(), 0)) // last day of prev month
+            )
+          : Promise.resolve([])
+      ])
       setTransactions(txs)
+      if (balanceRollover) {
+        const prev = prevTxs.reduce((a, t) => t.type === 'income' ? a + t.amount : a - t.amount, 0)
+        setPrevBalance(prev)
+      } else {
+        setPrevBalance(0)
+      }
     } catch (e) { console.error('Home load error:', e) }
     finally { setLoading(false) }
   }
 
   const income   = transactions.filter(t => t.type === 'income').reduce((a, t) => a + t.amount, 0)
   const expenses = transactions.filter(t => t.type === 'expense').reduce((a, t) => a + t.amount, 0)
-  const balance  = income - expenses
+  const balance  = prevBalance + income - expenses
   const savings  = balance > 0 ? balance : 0
   const recent   = transactions.slice(0, 5)
   const fmt      = n => fmtCurrency(n, currency)
@@ -72,7 +84,10 @@ export default function Home({ onNavigate }) {
           <div className="balance-nav-row">
             <MonthNavigator date={month} onChange={setMonth} />
           </div>
-          <div className="balance-label">Total Balance</div>
+          <div className="balance-label-row">
+            <div className="balance-label">Total Balance</div>
+            {balanceRollover && <div className="rollover-badge">↩ Rollover On</div>}
+          </div>
           <div className={`balance-amount ${balance < 0 ? 'negative' : ''}`}>{fmt(balance)}</div>
           <div className="balance-change">
             <span className={balance >= 0 ? 'change-up' : 'change-down'}>
@@ -100,6 +115,14 @@ export default function Home({ onNavigate }) {
             <div className="stat-card-value savings-val">{fmtCurrencyCompact(savings, currency)}</div>
           </div>
         </div>
+
+        {/* Daily Summary */}
+        {!loading && (
+          <DailySummary
+            monthTransactions={transactions}
+            onNavigate={onNavigate}
+          />
+        )}
 
         {/* Quick actions */}
         <div className="quick-actions">
