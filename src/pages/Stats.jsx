@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import { getTransactions } from '../firebase/service'
-import { groupByCategory, fmtCurrency, toFirestoreDate } from '../utils/helpers'
-import { startOfMonth, endOfMonth, startOfYear, endOfYear, startOfWeek, endOfWeek, format } from 'date-fns'
-import MonthNavigator from '../components/MonthNavigator'
+import { groupByCategory, fmtCurrency, fmtCurrencyCompact, toFirestoreDate } from '../utils/helpers'
+import {
+  startOfMonth, endOfMonth, startOfYear, endOfYear,
+  startOfWeek, endOfWeek, addMonths, subMonths,
+  addYears, subYears, addWeeks, subWeeks, format
+} from 'date-fns'
 import TransactionItem from '../components/TransactionItem'
 import AddTransaction from '../components/AddTransaction'
 import './Stats.css'
@@ -11,9 +14,9 @@ import './Stats.css'
 const PERIOD_OPTIONS = ['Weekly', 'Monthly', 'Annually', 'Custom']
 
 const COLORS = [
-  '#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#ff922b',
-  '#cc5de8','#20c997','#f06595','#74c0fc','#a9e34b',
-  '#f783ac','#38d9a9','#ff8787','#845ef7'
+  '#e05c5c','#3b82a0','#e8923a','#5ba05b','#8b5cf6',
+  '#c7a020','#2e8b7a','#d4608a','#4a7fc1','#7a9e3b',
+  '#b05090','#3a9e8a','#c0703a','#5070c0','#8e4e3e',
 ]
 
 const badgeColor = (pct) => {
@@ -25,104 +28,185 @@ const badgeColor = (pct) => {
   return '#06b6d4'
 }
 
-// ── SVG Pie with leader-line labels ───────────────────────────
-function PieChart({ data, colors }) {
-  const W = 340          // SVG canvas width
-  const H = 320          // SVG canvas height
-  const cx = W / 2       // pie centre x
-  const cy = H / 2 - 10 // pie centre y (slightly above middle)
-  const R  = 95          // outer radius
-  const Ri = 42          // inner hole radius
+// ── Squarified Treemap algorithm ─────────────────────────────
+// Returns array of { x, y, w, h, ...item } for each node
+function squarify(items, x, y, w, h) {
+  if (!items.length) return []
+  const total = items.reduce((s, i) => s + i.value, 0)
+  if (!total || w <= 0 || h <= 0) return []
 
-  const total = data.reduce((s, d) => s + d.amount, 0)
-  if (!total) return null
+  const results = []
+  let remaining = [...items]
+  let rx = x, ry = y, rw = w, rh = h
 
-  let startAngle = -Math.PI / 2
-  const slices = []
+  while (remaining.length > 0) {
+    const isWide = rw >= rh
+    const rowLength = isWide ? rh : rw
+    const rowItems = []
+    let rowSum = 0
+    let bestRatio = Infinity
 
-  data.forEach((d, i) => {
-    const frac   = d.amount / total
-    const angle  = Math.min(frac * 2 * Math.PI, 2 * Math.PI - 0.001)
-    const end    = startAngle + angle
-    const mid    = startAngle + angle / 2
+    for (let i = 0; i < remaining.length; i++) {
+      rowItems.push(remaining[i])
+      rowSum += remaining[i].value
+      const rowArea = (rowSum / total) * (rw * rh)
+      const rowWidth = rowArea / rowLength
+      let ratio = 0
+      for (const item of rowItems) {
+        const itemLen = (item.value / rowSum) * rowLength
+        ratio = Math.max(ratio, Math.max(rowWidth / itemLen, itemLen / rowWidth))
+      }
+      if (ratio > bestRatio && rowItems.length > 1) {
+        rowItems.pop()
+        break
+      }
+      bestRatio = ratio
+    }
 
-    // Arc points
-    const cos0 = Math.cos(startAngle), sin0 = Math.sin(startAngle)
-    const cos1 = Math.cos(end),        sin1 = Math.sin(end)
-    const cosMid = Math.cos(mid),      sinMid = Math.sin(mid)
-    const large  = angle > Math.PI ? 1 : 0
+    // Layout this row
+    const rowSum2 = rowItems.reduce((s, i) => s + i.value, 0)
+    const rowArea = (rowSum2 / total) * (rw * rh)
+    const rowWidth = rowArea / rowLength
+    let offset = isWide ? ry : rx
 
-    const path = [
-      `M ${cx + Ri*cos0} ${cy + Ri*sin0}`,
-      `A ${Ri} ${Ri} 0 ${large} 1 ${cx + Ri*cos1} ${cy + Ri*sin1}`,
-      `L ${cx + R*cos1} ${cy + R*sin1}`,
-      `A ${R}  ${R}  0 ${large} 0 ${cx + R*cos0} ${cy + R*sin0}`,
-      'Z'
-    ].join(' ')
-
-    // Leader line: starts at outer edge, goes outward
-    const LR1  = R + 6              // line start (just outside slice)
-    const LR2  = R + 22             // line elbow distance
-    const isRight = cosMid >= 0     // right side of chart
-    const elbowX  = cx + LR2 * cosMid
-    const elbowY  = cy + LR2 * sinMid
-    // Horizontal leg — clamped so text stays on screen
-    const horizLen = 18
-    const textX = isRight
-      ? Math.min(elbowX + horizLen, W - 4)
-      : Math.max(elbowX - horizLen, 4)
-    const anchor = isRight ? 'start' : 'end'
-
-    const shortName = d.name.length > 10 ? d.name.slice(0, 10) + '…' : d.name
-
-    slices.push({
-      path, color: colors[i % colors.length],
-      lx0: cx + LR1 * cosMid, ly0: cy + LR1 * sinMid,
-      elbowX, elbowY, textX, textY: elbowY,
-      anchor, shortName,
-      pctLabel: `${Math.round(d.pct)} %`,
-      show: d.pct >= 2
+    rowItems.forEach(item => {
+      const itemLen = (item.value / rowSum2) * rowLength
+      const rect = isWide
+        ? { x: rx, y: offset, w: rowWidth, h: itemLen }
+        : { x: offset, y: ry, w: itemLen, h: rowWidth }
+      results.push({ ...item, ...rect })
+      offset += itemLen
     })
 
-    startAngle = end
-  })
+    remaining = remaining.slice(rowItems.length)
+    if (isWide) { rx += rowWidth; rw -= rowWidth }
+    else        { ry += rowWidth; rh -= rowWidth }
+  }
+
+  return results
+}
+
+// ── Treemap component ─────────────────────────────────────────
+function Treemap({ data, colors, fmt, fmtC, onSelect }) {
+  const containerRef = useRef(null)
+  const [dims, setDims] = useState({ w: 0, h: 0 })
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const obs = new ResizeObserver(entries => {
+      const { width, height } = entries[0].contentRect
+      setDims({ w: Math.floor(width), h: Math.floor(height) })
+    })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
+
+  const { w, h } = dims
+  const GAP = 3
+
+  // Map data to treemap input
+  const items = data.map((d, i) => ({
+    ...d,
+    value: d.amount,
+    color: colors[i % colors.length],
+    index: i,
+  }))
+
+  const rects = (w > 0 && h > 0) ? squarify(items, 0, 0, w, h) : []
 
   return (
-    <svg
-      width="100%"
-      viewBox={`0 0 ${W} ${H}`}
-      style={{ display: 'block', overflow: 'visible' }}
-    >
-      {slices.map((s, i) => (
-        <path key={i} d={s.path} fill={s.color} stroke="#0d0f14" strokeWidth={1.5} />
-      ))}
-      {slices.map((s, i) => s.show && (
-        <g key={`lbl-${i}`}>
-          <polyline
-            points={`${s.lx0},${s.ly0} ${s.elbowX},${s.elbowY} ${s.textX},${s.textY}`}
-            fill="none" stroke={s.color} strokeWidth={0.9} opacity={0.8}
-          />
-          <text
-            x={s.textX + (s.anchor === 'start' ? 2 : -2)}
-            y={s.textY - 5}
-            fill="#e0e6ff" fontSize={9.5} fontWeight={600}
-            textAnchor={s.anchor}
-            fontFamily="Plus Jakarta Sans, sans-serif"
+    <div ref={containerRef} className="treemap-container">
+      {rects.map((r, i) => {
+        const rectW = r.w - GAP
+        const rectH = r.h - GAP
+        if (rectW <= 4 || rectH <= 4) return null
+
+        const showLabel = rectW >= 50 && rectH >= 36
+        const showSub   = rectW >= 70 && rectH >= 52
+        const showAmt   = rectW >= 60 && rectH >= 64
+
+        // Truncate name based on available width
+        const maxChars = Math.max(3, Math.floor(rectW / 8))
+        const displayName = r.name.length > maxChars
+          ? r.name.slice(0, maxChars) + '…'
+          : r.name
+
+        return (
+          <button
+            key={r.name}
+            className="treemap-cell"
+            style={{
+              left: r.x + GAP / 2, top: r.y + GAP / 2,
+              width: rectW, height: rectH,
+              background: r.color,
+            }}
+            onClick={() => onSelect && onSelect(r)}
           >
-            {s.shortName}
-          </text>
-          <text
-            x={s.textX + (s.anchor === 'start' ? 2 : -2)}
-            y={s.textY + 7}
-            fill={s.color} fontSize={9.5} fontWeight={700}
-            textAnchor={s.anchor}
-            fontFamily="Plus Jakarta Sans, sans-serif"
-          >
-            {s.pctLabel}
-          </text>
-        </g>
-      ))}
-    </svg>
+            {showLabel && (
+              <div className="treemap-label">
+                <div className="treemap-name"
+                  style={{ fontSize: Math.min(14, Math.max(9, rectW / 9)) }}
+                >
+                  {displayName}
+                </div>
+                {showSub && (
+                  <div className="treemap-pct"
+                    style={{ fontSize: Math.min(12, Math.max(8, rectW / 11)) }}
+                  >
+                    {r.pct}%
+                  </div>
+                )}
+                {showAmt && (
+                  <div className="treemap-amt"
+                    style={{ fontSize: Math.min(11, Math.max(8, rectW / 12)) }}
+                  >
+                    {fmtC(r.amount)}
+                  </div>
+                )}
+              </div>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Smart period navigator ────────────────────────────────────
+function PeriodNav({ period, anchor, onChange }) {
+  const prev = () => {
+    if (period === 'Monthly')  onChange(subMonths(anchor, 1))
+    if (period === 'Annually') onChange(subYears(anchor, 1))
+    if (period === 'Weekly')   onChange(subWeeks(anchor, 1))
+  }
+  const next = () => {
+    if (period === 'Monthly')  onChange(addMonths(anchor, 1))
+    if (period === 'Annually') onChange(addYears(anchor, 1))
+    if (period === 'Weekly')   onChange(addWeeks(anchor, 1))
+  }
+  const label = () => {
+    if (period === 'Monthly')  return format(anchor, 'MMMM yyyy')
+    if (period === 'Annually') return format(anchor, 'yyyy')
+    if (period === 'Weekly') {
+      const s = startOfWeek(anchor, { weekStartsOn: 1 })
+      const e = endOfWeek(anchor,   { weekStartsOn: 1 })
+      return `${format(s, 'MMM d')} – ${format(e, 'MMM d, yyyy')}`
+    }
+    return ''
+  }
+  const isAtLimit = () => {
+    if (period === 'Annually') return anchor.getFullYear() >= new Date().getFullYear()
+    if (period === 'Monthly')  return anchor >= startOfMonth(new Date())
+    if (period === 'Weekly')   return anchor >= startOfWeek(new Date(), { weekStartsOn: 1 })
+    return false
+  }
+  return (
+    <div className="period-nav">
+      <button className="period-nav-btn" onClick={prev}>‹</button>
+      <span className="period-nav-label">{label()}</span>
+      <button className="period-nav-btn" onClick={next} disabled={isAtLimit()}>›</button>
+    </div>
   )
 }
 
@@ -142,8 +226,8 @@ export default function Stats() {
   useEffect(() => { load() }, [period, anchor, customStart, customEnd, householdId, reloadTrigger])
 
   const getRange = () => {
-    if (period === 'Custom') return { start: customStart, end: customEnd }
-    if (period === 'Weekly') return {
+    if (period === 'Custom')   return { start: customStart, end: customEnd }
+    if (period === 'Weekly')   return {
       start: toFirestoreDate(startOfWeek(anchor, { weekStartsOn: 1 })),
       end:   toFirestoreDate(endOfWeek(anchor,   { weekStartsOn: 1 }))
     }
@@ -151,10 +235,7 @@ export default function Stats() {
       start: toFirestoreDate(startOfYear(anchor)),
       end:   toFirestoreDate(endOfYear(anchor))
     }
-    return {
-      start: toFirestoreDate(startOfMonth(anchor)),
-      end:   toFirestoreDate(endOfMonth(anchor))
-    }
+    return { start: toFirestoreDate(startOfMonth(anchor)), end: toFirestoreDate(endOfMonth(anchor)) }
   }
 
   const load = async () => {
@@ -166,7 +247,9 @@ export default function Stats() {
     } finally { setLoading(false) }
   }
 
-  const fmt          = n => fmtCurrency(n, currency)
+  const fmt  = n => fmtCurrency(n, currency)
+  const fmtC = n => fmtCurrencyCompact(n, currency)
+
   const breakdown    = groupByCategory(transactions, txType)
   const incomeTotal  = transactions.filter(t => t.type === 'income').reduce((a,t)  => a+t.amount, 0)
   const expenseTotal = transactions.filter(t => t.type === 'expense').reduce((a,t) => a+t.amount, 0)
@@ -195,25 +278,21 @@ export default function Stats() {
 
   const periodLabel = () => {
     if (period === 'Weekly')   return `Week of ${format(startOfWeek(anchor,{weekStartsOn:1}),'MMM d')}`
-    if (period === 'Annually') return format(anchor,'yyyy')
-    if (period === 'Monthly')  return format(anchor,'MMMM yyyy')
+    if (period === 'Annually') return format(anchor, 'yyyy')
+    if (period === 'Monthly')  return format(anchor, 'MMMM yyyy')
     return `${customStart} → ${customEnd}`
   }
 
   return (
     <div className="screen stats-screen">
-
       {/* Period tabs */}
       <div className="stats-header">
         <div className="stats-period-tabs">
           {PERIOD_OPTIONS.map(p => (
-            <button
-              key={p}
+            <button key={p}
               className={`stats-period-tab ${period === p ? 'active' : ''}`}
               onClick={() => setPeriod(p)}
-            >
-              {p}
-            </button>
+            >{p}</button>
           ))}
         </div>
         <div className="stats-nav-row">
@@ -224,12 +303,12 @@ export default function Stats() {
               <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} />
             </div>
           ) : (
-            <MonthNavigator date={anchor} onChange={setAnchor} />
+            <PeriodNav period={period} anchor={anchor} onChange={setAnchor} />
           )}
         </div>
       </div>
 
-      {/* Income / Expense tabs with totals */}
+      {/* Income / Expense tabs */}
       <div className="stats-type-tabs">
         <button
           className={`stats-type-tab ${txType === 'income' ? 'active' : ''}`}
@@ -247,7 +326,7 @@ export default function Stats() {
         </button>
       </div>
 
-      <div className="scroll-area">
+      <div className="scroll-area stats-scroll">
         {loading ? (
           <div className="load-row"><span className="spinner" /></div>
         ) : breakdown.length === 0 ? (
@@ -257,9 +336,15 @@ export default function Stats() {
           </div>
         ) : (
           <>
-            {/* Pie chart */}
-            <div className="stats-pie-section">
-              <PieChart data={breakdown} colors={COLORS} />
+            {/* Treemap */}
+            <div className="treemap-wrap">
+              <Treemap
+                data={breakdown}
+                colors={COLORS}
+                fmt={fmt}
+                fmtC={fmtC}
+                onSelect={d => { setDrillCat(d.name); setDrillSub(null) }}
+              />
             </div>
 
             {/* Category list */}
@@ -268,11 +353,10 @@ export default function Stats() {
                 const catDef = categories.find(c => c.name === cat.name)
                 const icon   = catDef?.icon || ''
                 return (
-                  <button
-                    key={cat.name}
-                    className="stats-cat-item"
+                  <button key={cat.name} className="stats-cat-item"
                     onClick={() => { setDrillCat(cat.name); setDrillSub(null) }}
                   >
+                    <div className="stats-cat-swatch" style={{ background: COLORS[i % COLORS.length] }} />
                     <div className="stats-pct-badge" style={{ background: badgeColor(cat.pct) }}>
                       {cat.pct}%
                     </div>
@@ -351,10 +435,8 @@ export default function Stats() {
                 {fmt(subTxs.reduce((a,t) => a+t.amount, 0))} · {subTxs.length} transactions
               </div>
               {subTxs.map(tx => (
-                <TransactionItem
-                  key={tx.id} tx={tx} categories={categories}
-                  onClick={t => { setDrillCat(null); setDrillSub(null); setEditTx(t) }}
-                />
+                <TransactionItem key={tx.id} tx={tx} categories={categories}
+                  onClick={t => { setDrillCat(null); setDrillSub(null); setEditTx(t) }} />
               ))}
             </div>
           </div>
@@ -362,11 +444,8 @@ export default function Stats() {
       )}
 
       {editTx && (
-        <AddTransaction
-          tx={editTx}
-          onClose={() => setEditTx(null)}
-          onSaved={() => { setEditTx(null); load() }}
-        />
+        <AddTransaction tx={editTx} onClose={() => setEditTx(null)}
+          onSaved={() => { setEditTx(null); load() }} />
       )}
     </div>
   )

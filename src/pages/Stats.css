@@ -18,6 +18,22 @@
 
 .stats-nav-row { display: flex; align-items: center; margin-bottom: 4px; }
 
+.period-nav {
+  display: flex; align-items: center; gap: 12px; width: 100%; justify-content: center;
+}
+.period-nav-btn {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--bg-elevated); color: var(--text-secondary); font-size: 20px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all var(--transition); flex-shrink: 0;
+}
+.period-nav-btn:active  { opacity: 0.6; transform: scale(0.9); }
+.period-nav-btn:disabled { opacity: 0.25; pointer-events: none; }
+.period-nav-label {
+  font-size: 15px; font-weight: 700; color: var(--text-primary);
+  text-align: center; min-width: 160px;
+}
+
 .custom-range { display: flex; align-items: center; gap: 10px; width: 100%; }
 .custom-range input {
   flex: 1; background: var(--bg-elevated); border: 1.5px solid var(--border);
@@ -41,27 +57,80 @@
 .stats-type-tab.active       { color: var(--text-primary); border-bottom-color: var(--green); }
 .stats-type-tab.active.expense { border-bottom-color: var(--accent); }
 .stt-label { font-size: 14px; font-weight: 600; }
-.stt-total {
-  font-size: clamp(12px, 3.5vw, 16px);
-  font-weight: 800;
-  overflow: hidden; text-overflow: ellipsis;
-}
+.stt-total { font-size: clamp(12px, 3.5vw, 16px); font-weight: 800; overflow: hidden; text-overflow: ellipsis; }
 .stats-type-tab.active         .stt-total { color: var(--green); }
 .stats-type-tab.active.expense .stt-total { color: var(--accent); }
 
-/* Pie */
-.stats-pie-section {
-  padding: 16px 12px 4px;
-  /* Clip so labels don't bleed outside the page */
-  overflow: hidden;
+/* Scroll area — must NOT clip treemap */
+.stats-scroll { overflow-y: auto; }
+
+/* Treemap */
+.treemap-wrap {
+  padding: 14px 16px 4px;
+  height: 320px;       /* fixed height so it fills nicely */
+  flex-shrink: 0;
 }
 
-/* Category list */
+.treemap-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-md);
+  overflow: hidden;    /* clips children cleanly */
+}
+
+.treemap-cell {
+  position: absolute;
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 6px 7px;
+  transition: opacity var(--transition);
+  cursor: pointer;
+  border: none;
+  /* Subtle inner border to separate adjacent cells */
+  box-shadow: inset 0 0 0 1.5px rgba(0,0,0,0.25);
+}
+.treemap-cell:active { opacity: 0.75; }
+
+.treemap-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  pointer-events: none;
+}
+
+.treemap-name {
+  font-weight: 700;
+  color: rgba(255,255,255,0.95);
+  line-height: 1.2;
+  word-break: break-word;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  /* Don't truncate — we pre-truncate in JS */
+}
+
+.treemap-pct {
+  font-weight: 800;
+  color: rgba(255,255,255,0.85);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+}
+
+.treemap-amt {
+  font-weight: 600;
+  color: rgba(255,255,255,0.72);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+/* Category list below treemap */
 .stats-cat-list { padding: 8px 20px 32px; }
 
 .stats-cat-item {
   width: 100%;
-  display: flex; align-items: center; gap: 12px;
+  display: flex; align-items: center; gap: 10px;
   padding: 13px 0;
   border-bottom: 1px solid var(--border);
   text-align: left; transition: opacity var(--transition);
@@ -69,24 +138,26 @@
 .stats-cat-item:last-child { border-bottom: none; }
 .stats-cat-item:active { opacity: 0.6; }
 
+.stats-cat-swatch {
+  width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0;
+}
+
 .stats-pct-badge {
-  min-width: 50px; height: 30px;
-  border-radius: 8px;
+  min-width: 46px; height: 26px;
+  border-radius: 7px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 800;
+  font-size: 12px; font-weight: 800;
   color: #fff; flex-shrink: 0;
 }
 
 .stats-cat-name {
-  flex: 1; display: flex; align-items: center; gap: 6px;
-  min-width: 0;
+  flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0;
 }
-.stats-cat-icon { font-size: 16px; flex-shrink: 0; }
+.stats-cat-icon { font-size: 15px; flex-shrink: 0; }
 .stats-cat-text {
-  font-size: 15px; font-weight: 600; color: var(--text-primary);
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-
 .stats-cat-amount {
   font-size: 14px; font-weight: 700; color: var(--text-primary);
   white-space: nowrap; flex-shrink: 0;
