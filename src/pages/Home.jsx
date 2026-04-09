@@ -1,23 +1,34 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import { getTransactions } from '../firebase/service'
+import { getSavingsAccounts } from '../firebase/savingsLoans'
 import { fmtCurrency, fmtCurrencyCompact, toFirestoreDate } from '../utils/helpers'
-import { startOfMonth, endOfMonth, format } from 'date-fns'
+import { startOfMonth, endOfMonth } from 'date-fns'
 import MonthNavigator from '../components/MonthNavigator'
 import TransactionItem from '../components/TransactionItem'
 import AddTransaction from '../components/AddTransaction'
 import InviteBanner from '../components/InviteBanner'
 import DailySummary from '../components/DailySummary'
+import SavingsLoansSheet from '../components/SavingsLoansSheet'
 import './Home.css'
 
+function firstName(profile, user) {
+  const name = profile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'there'
+  return name.split(' ')[0]
+}
+
 export default function Home({ onNavigate }) {
-  const { user, profile, householdId, categories, pendingInvites, handleAcceptInvite, theme, toggleTheme, household, dataLoading, reloadTrigger, currency, balanceRollover } = useApp()
-  const [month, setMonth]           = useState(new Date())
+  const { user, profile, householdId, categories, pendingInvites, handleAcceptInvite,
+          theme, toggleTheme, household, dataLoading, reloadTrigger, currency, balanceRollover } = useApp()
+
+  const [month, setMonth]               = useState(new Date())
   const [transactions, setTransactions] = useState([])
   const [prevBalance, setPrevBalance]   = useState(0)
-  const [loading, setLoading]       = useState(false)
-  const [showAdd, setShowAdd]       = useState(false)
-  const [editTx, setEditTx]         = useState(null)
+  const [totalSavings, setTotalSavings] = useState(0)
+  const [loading, setLoading]           = useState(false)
+  const [showAdd, setShowAdd]           = useState(false)
+  const [editTx, setEditTx]             = useState(null)
+  const [showSavings, setShowSavings]   = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -28,18 +39,16 @@ export default function Home({ onNavigate }) {
     if (!user) return
     setLoading(true)
     try {
-      const [txs, prevTxs] = await Promise.all([
+      const [txs, prevTxs, savAccts] = await Promise.all([
         getTransactions(user.uid, householdId,
           toFirestoreDate(startOfMonth(month)),
           toFirestoreDate(endOfMonth(month))
         ),
-        // If rollover is on, fetch all transactions before this month
         balanceRollover
-          ? getTransactions(user.uid, householdId,
-              '2000-01-01',
-              toFirestoreDate(new Date(month.getFullYear(), month.getMonth(), 0)) // last day of prev month
-            )
-          : Promise.resolve([])
+          ? getTransactions(user.uid, householdId, '2000-01-01',
+              toFirestoreDate(new Date(month.getFullYear(), month.getMonth(), 0)))
+          : Promise.resolve([]),
+        getSavingsAccounts(user.uid, householdId)
       ])
       setTransactions(txs)
       if (balanceRollover) {
@@ -48,6 +57,7 @@ export default function Home({ onNavigate }) {
       } else {
         setPrevBalance(0)
       }
+      setTotalSavings(savAccts.reduce((a, s) => a + (s.balance || 0), 0))
     } catch (e) { console.error('Home load error:', e) }
     finally { setLoading(false) }
   }
@@ -55,9 +65,9 @@ export default function Home({ onNavigate }) {
   const income   = transactions.filter(t => t.type === 'income').reduce((a, t) => a + t.amount, 0)
   const expenses = transactions.filter(t => t.type === 'expense').reduce((a, t) => a + t.amount, 0)
   const balance  = prevBalance + income - expenses
-  const savings  = balance > 0 ? balance : 0
   const recent   = transactions.slice(0, 5)
   const fmt      = n => fmtCurrency(n, currency)
+  const fmtC     = n => fmtCurrencyCompact(n, currency)
 
   const handleSaved = () => { setShowAdd(false); setEditTx(null); load() }
 
@@ -79,7 +89,7 @@ export default function Home({ onNavigate }) {
           <InviteBanner key={invite.id} invite={invite} onAccept={handleAcceptInvite} />
         ))}
 
-        {/* Total Balance card — green gradient */}
+        {/* Balance card */}
         <div className="balance-card">
           <div className="balance-nav-row">
             <MonthNavigator date={month} onChange={setMonth} />
@@ -97,31 +107,30 @@ export default function Home({ onNavigate }) {
           </div>
         </div>
 
-        {/* 3 stat cards */}
+        {/* 3 stat cards — Savings is now a button */}
         <div className="home-stat-cards">
           <div className="stat-card income-card">
             <div className="stat-card-icon income-icon">↗</div>
             <div className="stat-card-label">Income</div>
-            <div className="stat-card-value income-val">{fmtCurrencyCompact(income, currency)}</div>
+            <div className="stat-card-value income-val">{fmtC(income)}</div>
           </div>
           <div className="stat-card expense-card">
             <div className="stat-card-icon expense-icon">↘</div>
             <div className="stat-card-label">Expenses</div>
-            <div className="stat-card-value expense-val">{fmtCurrencyCompact(expenses, currency)}</div>
+            <div className="stat-card-value expense-val">{fmtC(expenses)}</div>
           </div>
-          <div className="stat-card savings-card">
+          {/* Savings — tappable */}
+          <button className="stat-card savings-card savings-btn" onClick={() => setShowSavings(true)}>
             <div className="stat-card-icon savings-icon">🐖</div>
             <div className="stat-card-label">Savings</div>
-            <div className="stat-card-value savings-val">{fmtCurrencyCompact(savings, currency)}</div>
-          </div>
+            <div className="stat-card-value savings-val">{fmtC(totalSavings)}</div>
+            <div className="savings-tap-hint">Tap to manage →</div>
+          </button>
         </div>
 
         {/* Daily Summary */}
         {!loading && (
-          <DailySummary
-            monthTransactions={transactions}
-            onNavigate={onNavigate}
-          />
+          <DailySummary monthTransactions={transactions} onNavigate={onNavigate} />
         )}
 
         {/* Quick actions */}
@@ -172,11 +181,10 @@ export default function Home({ onNavigate }) {
           onSaved={handleSaved}
         />
       )}
+
+      {showSavings && (
+        <SavingsLoansSheet onClose={() => { setShowSavings(false); load() }} />
+      )}
     </div>
   )
-}
-
-function firstName(profile, user) {
-  const name = profile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'there'
-  return name.split(' ')[0]
 }
