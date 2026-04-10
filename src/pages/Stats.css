@@ -1,6 +1,5 @@
 .stats-screen { background: var(--bg); }
 
-/* Period tabs */
 .stats-header { padding: 16px 20px 0; flex-shrink: 0; }
 
 .stats-period-tabs {
@@ -27,7 +26,7 @@
   display: flex; align-items: center; justify-content: center;
   transition: all var(--transition); flex-shrink: 0;
 }
-.period-nav-btn:active  { opacity: 0.6; transform: scale(0.9); }
+.period-nav-btn:active   { opacity: 0.6; transform: scale(0.9); }
 .period-nav-btn:disabled { opacity: 0.25; pointer-events: none; }
 .period-nav-label {
   font-size: 15px; font-weight: 700; color: var(--text-primary);
@@ -41,113 +40,106 @@
 }
 .custom-range span { color: var(--text-muted); font-weight: 600; }
 
-/* Income/Expense tabs */
+/* 4-tab type selector */
 .stats-type-tabs {
-  display: flex; border-bottom: 1px solid var(--border);
-  margin: 0 20px; flex-shrink: 0;
+  display: flex; flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  margin: 0 20px;
+  gap: 0;
 }
+
 .stats-type-tab {
-  flex: 1; padding: 10px 8px;
-  display: flex; align-items: baseline; gap: 8px;
-  font-size: 14px; font-weight: 600; color: var(--text-muted);
+  flex: 1; padding: 9px 4px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  font-size: 12px; font-weight: 600; color: var(--text-muted);
   border-bottom: 2px solid transparent; margin-bottom: -1px;
-  transition: all var(--transition); justify-content: center;
-  white-space: nowrap; overflow: hidden;
+  transition: all var(--transition);
+  min-width: 0;
 }
-.stats-type-tab.active       { color: var(--text-primary); border-bottom-color: var(--green); }
+.stats-type-tab.active         { color: var(--text-primary); border-bottom-color: var(--green); }
 .stats-type-tab.active.expense { border-bottom-color: var(--accent); }
-.stt-label { font-size: 14px; font-weight: 600; }
-.stt-total { font-size: clamp(12px, 3.5vw, 16px); font-weight: 800; overflow: hidden; text-overflow: ellipsis; }
+.stats-type-tab.active.savings { border-bottom-color: #00c48c; }
+.stats-type-tab.active.loans   { border-bottom-color: #4a80e8; }
+
+.stt-label { font-size: 12px; font-weight: 700; }
+.stt-total {
+  font-size: clamp(10px, 2.5vw, 13px); font-weight: 800;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 100%;
+}
 .stats-type-tab.active         .stt-total { color: var(--green); }
 .stats-type-tab.active.expense .stt-total { color: var(--accent); }
+.stats-type-tab.active.savings .stt-total { color: #00c48c; }
+.stats-type-tab.active.loans   .stt-total { color: #4a80e8; }
 
-/* Scroll area — must NOT clip treemap */
+/* Scroll */
 .stats-scroll { overflow-y: auto; }
 
 /* Treemap */
 .treemap-wrap {
-  padding: 14px 16px 4px;
-  height: 320px;       /* fixed height so it fills nicely */
+  padding: 12px 14px 6px;
+  height: 340px;
   flex-shrink: 0;
 }
 
 .treemap-container {
   position: relative;
-  width: 100%;
-  height: 100%;
+  width: 100%; height: 100%;
   border-radius: var(--radius-md);
-  overflow: hidden;    /* clips children cleanly */
+  overflow: hidden;
 }
 
 .treemap-cell {
   position: absolute;
-  border-radius: 6px;
+  border-radius: 4px;
   overflow: hidden;
   display: flex;
   align-items: flex-start;
   justify-content: flex-start;
-  padding: 6px 7px;
-  transition: opacity var(--transition);
+  padding: 5px 6px;
   cursor: pointer;
   border: none;
-  /* Subtle inner border to separate adjacent cells */
-  box-shadow: inset 0 0 0 1.5px rgba(0,0,0,0.25);
+  box-shadow: inset 0 0 0 1.5px rgba(0,0,0,0.2);
+  transition: filter var(--transition);
 }
-.treemap-cell:active { opacity: 0.75; }
+.treemap-cell:active { filter: brightness(0.85); }
 
 .treemap-label {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
-  width: 100%;
-  pointer-events: none;
+  display: flex; flex-direction: column; gap: 1px;
+  width: 100%; pointer-events: none;
 }
 
 .treemap-name {
-  font-weight: 700;
-  color: rgba(255,255,255,0.95);
-  line-height: 1.2;
+  font-weight: 700; color: rgba(255,255,255,0.95); line-height: 1.2;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.45);
   word-break: break-word;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
-  /* Don't truncate — we pre-truncate in JS */
 }
-
 .treemap-pct {
-  font-weight: 800;
-  color: rgba(255,255,255,0.85);
+  font-weight: 800; color: rgba(255,255,255,0.88);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+.treemap-amt {
+  font-weight: 600; color: rgba(255,255,255,0.72);
   text-shadow: 0 1px 2px rgba(0,0,0,0.35);
 }
 
-.treemap-amt {
-  font-weight: 600;
-  color: rgba(255,255,255,0.72);
-  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-}
-
-/* Category list below treemap */
+/* Category list */
 .stats-cat-list { padding: 8px 20px 32px; }
 
 .stats-cat-item {
-  width: 100%;
-  display: flex; align-items: center; gap: 10px;
-  padding: 13px 0;
-  border-bottom: 1px solid var(--border);
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 12px 0; border-bottom: 1px solid var(--border);
   text-align: left; transition: opacity var(--transition);
 }
 .stats-cat-item:last-child { border-bottom: none; }
 .stats-cat-item:active { opacity: 0.6; }
 
-.stats-cat-swatch {
-  width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0;
-}
+.stats-cat-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 
 .stats-pct-badge {
-  min-width: 46px; height: 26px;
-  border-radius: 7px;
+  min-width: 44px; height: 24px; border-radius: 6px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 800;
-  color: #fff; flex-shrink: 0;
+  font-size: 11px; font-weight: 800; color: #fff; flex-shrink: 0;
 }
 
 .stats-cat-name {

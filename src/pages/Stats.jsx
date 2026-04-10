@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import { getTransactions } from '../firebase/service'
+import { getSavingsAccounts, getLoans, getSavingsTransactions, getLoanPayments } from '../firebase/savingsLoans'
 import { groupByCategory, fmtCurrency, fmtCurrencyCompact, toFirestoreDate } from '../utils/helpers'
 import {
   startOfMonth, endOfMonth, startOfYear, endOfYear,
@@ -12,6 +13,7 @@ import AddTransaction from '../components/AddTransaction'
 import './Stats.css'
 
 const PERIOD_OPTIONS = ['Weekly', 'Monthly', 'Annually', 'Custom']
+const TX_TYPES = ['expense', 'income', 'savings', 'loans']
 
 const COLORS = [
   '#e05c5c','#3b82a0','#e8923a','#5ba05b','#8b5cf6',
@@ -28,44 +30,38 @@ const badgeColor = (pct) => {
   return '#06b6d4'
 }
 
-// ── Squarified Treemap algorithm ─────────────────────────────
-// Returns array of { x, y, w, h, ...item } for each node
+// ── Squarified Treemap ───────────────────────────────────────
 function squarify(items, x, y, w, h) {
-  if (!items.length) return []
+  if (!items.length || w <= 0 || h <= 0) return []
   const total = items.reduce((s, i) => s + i.value, 0)
-  if (!total || w <= 0 || h <= 0) return []
+  if (!total) return []
 
   const results = []
   let remaining = [...items]
   let rx = x, ry = y, rw = w, rh = h
 
   while (remaining.length > 0) {
-    const isWide = rw >= rh
+    const isWide    = rw >= rh
     const rowLength = isWide ? rh : rw
-    const rowItems = []
-    let rowSum = 0
-    let bestRatio = Infinity
+    const rowItems  = []
+    let rowSum = 0, bestRatio = Infinity
 
     for (let i = 0; i < remaining.length; i++) {
       rowItems.push(remaining[i])
       rowSum += remaining[i].value
-      const rowArea = (rowSum / total) * (rw * rh)
+      const rowArea  = (rowSum / total) * (rw * rh)
       const rowWidth = rowArea / rowLength
       let ratio = 0
       for (const item of rowItems) {
         const itemLen = (item.value / rowSum) * rowLength
         ratio = Math.max(ratio, Math.max(rowWidth / itemLen, itemLen / rowWidth))
       }
-      if (ratio > bestRatio && rowItems.length > 1) {
-        rowItems.pop()
-        break
-      }
+      if (ratio > bestRatio && rowItems.length > 1) { rowItems.pop(); break }
       bestRatio = ratio
     }
 
-    // Layout this row
-    const rowSum2 = rowItems.reduce((s, i) => s + i.value, 0)
-    const rowArea = (rowSum2 / total) * (rw * rh)
+    const rowSum2  = rowItems.reduce((s, i) => s + i.value, 0)
+    const rowArea  = (rowSum2 / total) * (rw * rh)
     const rowWidth = rowArea / rowLength
     let offset = isWide ? ry : rx
 
@@ -82,11 +78,10 @@ function squarify(items, x, y, w, h) {
     if (isWide) { rx += rowWidth; rw -= rowWidth }
     else        { ry += rowWidth; rh -= rowWidth }
   }
-
   return results
 }
 
-// ── Treemap component ─────────────────────────────────────────
+// ── Treemap component ────────────────────────────────────────
 function Treemap({ data, colors, fmt, fmtC, onSelect }) {
   const containerRef = useRef(null)
   const [dims, setDims] = useState({ w: 0, h: 0 })
@@ -103,33 +98,37 @@ function Treemap({ data, colors, fmt, fmtC, onSelect }) {
   }, [])
 
   const { w, h } = dims
-  const GAP = 3
+  const GAP = 2
 
-  // Map data to treemap input
   const items = data.map((d, i) => ({
-    ...d,
-    value: d.amount,
-    color: colors[i % colors.length],
-    index: i,
+    ...d, value: d.amount, color: colors[i % colors.length], index: i,
   }))
 
   const rects = (w > 0 && h > 0) ? squarify(items, 0, 0, w, h) : []
 
   return (
     <div ref={containerRef} className="treemap-container">
-      {rects.map((r, i) => {
-        const rectW = r.w - GAP
-        const rectH = r.h - GAP
-        if (rectW <= 4 || rectH <= 4) return null
+      {rects.map((r) => {
+        const cw = r.w - GAP
+        const ch = r.h - GAP
+        if (cw <= 2 || ch <= 2) return null
 
-        const showLabel = rectW >= 50 && rectH >= 36
-        const showSub   = rectW >= 70 && rectH >= 52
-        const showAmt   = rectW >= 60 && rectH >= 64
+        // Adaptive font sizing based on cell dimensions
+        const area    = cw * ch
+        const minDim  = Math.min(cw, ch)
+        const nameFz  = Math.min(14, Math.max(7,  minDim / 5.5))
+        const pctFz   = Math.min(13, Math.max(7,  minDim / 6))
+        const amtFz   = Math.min(11, Math.max(6.5, minDim / 7))
 
-        // Truncate name based on available width
-        const maxChars = Math.max(3, Math.floor(rectW / 8))
+        // Show/hide layers based on available area
+        const showName = cw >= 24 && ch >= 18
+        const showPct  = cw >= 30 && ch >= 28  && area >= 800
+        const showAmt  = cw >= 36 && ch >= 42  && area >= 1400
+
+        // Truncate based on px width (approx 6px per char at default size)
+        const maxChars = Math.max(2, Math.floor(cw / (nameFz * 0.6)))
         const displayName = r.name.length > maxChars
-          ? r.name.slice(0, maxChars) + '…'
+          ? r.name.slice(0, maxChars - 1) + '…'
           : r.name
 
         return (
@@ -138,29 +137,23 @@ function Treemap({ data, colors, fmt, fmtC, onSelect }) {
             className="treemap-cell"
             style={{
               left: r.x + GAP / 2, top: r.y + GAP / 2,
-              width: rectW, height: rectH,
+              width: cw, height: ch,
               background: r.color,
             }}
             onClick={() => onSelect && onSelect(r)}
           >
-            {showLabel && (
+            {showName && (
               <div className="treemap-label">
-                <div className="treemap-name"
-                  style={{ fontSize: Math.min(14, Math.max(9, rectW / 9)) }}
-                >
+                <div className="treemap-name" style={{ fontSize: nameFz }}>
                   {displayName}
                 </div>
-                {showSub && (
-                  <div className="treemap-pct"
-                    style={{ fontSize: Math.min(12, Math.max(8, rectW / 11)) }}
-                  >
+                {showPct && (
+                  <div className="treemap-pct" style={{ fontSize: pctFz }}>
                     {r.pct}%
                   </div>
                 )}
                 {showAmt && (
-                  <div className="treemap-amt"
-                    style={{ fontSize: Math.min(11, Math.max(8, rectW / 12)) }}
-                  >
+                  <div className="treemap-amt" style={{ fontSize: amtFz }}>
                     {fmtC(r.amount)}
                   </div>
                 )}
@@ -173,7 +166,7 @@ function Treemap({ data, colors, fmt, fmtC, onSelect }) {
   )
 }
 
-// ── Smart period navigator ────────────────────────────────────
+// ── Period nav ───────────────────────────────────────────────
 function PeriodNav({ period, anchor, onChange }) {
   const prev = () => {
     if (period === 'Monthly')  onChange(subMonths(anchor, 1))
@@ -190,15 +183,15 @@ function PeriodNav({ period, anchor, onChange }) {
     if (period === 'Annually') return format(anchor, 'yyyy')
     if (period === 'Weekly') {
       const s = startOfWeek(anchor, { weekStartsOn: 1 })
-      const e = endOfWeek(anchor,   { weekStartsOn: 1 })
-      return `${format(s, 'MMM d')} – ${format(e, 'MMM d, yyyy')}`
+      const e = endOfWeek(anchor, { weekStartsOn: 1 })
+      return `${format(s,'MMM d')} – ${format(e,'MMM d, yyyy')}`
     }
     return ''
   }
   const isAtLimit = () => {
     if (period === 'Annually') return anchor.getFullYear() >= new Date().getFullYear()
     if (period === 'Monthly')  return anchor >= startOfMonth(new Date())
-    if (period === 'Weekly')   return anchor >= startOfWeek(new Date(), { weekStartsOn: 1 })
+    if (period === 'Weekly')   return anchor >= startOfWeek(new Date(),{weekStartsOn:1})
     return false
   }
   return (
@@ -212,58 +205,118 @@ function PeriodNav({ period, anchor, onChange }) {
 
 export default function Stats() {
   const { user, householdId, categories, reloadTrigger, currency } = useApp()
-  const [period, setPeriod]             = useState('Monthly')
-  const [anchor, setAnchor]             = useState(new Date())
-  const [customStart, setCustomStart]   = useState(toFirestoreDate(startOfMonth(new Date())))
-  const [customEnd, setCustomEnd]       = useState(toFirestoreDate(endOfMonth(new Date())))
-  const [txType, setTxType]             = useState('expense')
+  const [period, setPeriod]           = useState('Monthly')
+  const [anchor, setAnchor]           = useState(new Date())
+  const [customStart, setCustomStart] = useState(toFirestoreDate(startOfMonth(new Date())))
+  const [customEnd, setCustomEnd]     = useState(toFirestoreDate(endOfMonth(new Date())))
+  const [txType, setTxType]           = useState('expense')
   const [transactions, setTransactions] = useState([])
-  const [loading, setLoading]           = useState(true)
-  const [drillCat, setDrillCat]         = useState(null)
-  const [drillSub, setDrillSub]         = useState(null)
-  const [editTx, setEditTx]             = useState(null)
+  const [savingsAccounts, setSavingsAccounts] = useState([])
+  const [loans, setLoans]             = useState([])
+  const [loading, setLoading]         = useState(true)
+  const [drillCat, setDrillCat]       = useState(null)
+  const [drillSub, setDrillSub]       = useState(null)
+  const [editTx, setEditTx]           = useState(null)
 
   useEffect(() => { load() }, [period, anchor, customStart, customEnd, householdId, reloadTrigger])
 
   const getRange = () => {
     if (period === 'Custom')   return { start: customStart, end: customEnd }
     if (period === 'Weekly')   return {
-      start: toFirestoreDate(startOfWeek(anchor, { weekStartsOn: 1 })),
-      end:   toFirestoreDate(endOfWeek(anchor,   { weekStartsOn: 1 }))
+      start: toFirestoreDate(startOfWeek(anchor,{weekStartsOn:1})),
+      end:   toFirestoreDate(endOfWeek(anchor,{weekStartsOn:1}))
     }
     if (period === 'Annually') return {
       start: toFirestoreDate(startOfYear(anchor)),
       end:   toFirestoreDate(endOfYear(anchor))
     }
-    return { start: toFirestoreDate(startOfMonth(anchor)), end: toFirestoreDate(endOfMonth(anchor)) }
+    return {
+      start: toFirestoreDate(startOfMonth(anchor)),
+      end:   toFirestoreDate(endOfMonth(anchor))
+    }
   }
 
   const load = async () => {
     setLoading(true)
     try {
       const { start, end } = getRange()
-      const txs = await getTransactions(user.uid, householdId, start, end)
+      const [txs, savAccts, loanList] = await Promise.all([
+        getTransactions(user.uid, householdId, start, end),
+        getSavingsAccounts(user.uid, householdId),
+        getLoans(user.uid, householdId),
+      ])
       setTransactions(txs)
+      setSavingsAccounts(savAccts)
+      setLoans(loanList)
     } finally { setLoading(false) }
   }
 
   const fmt  = n => fmtCurrency(n, currency)
   const fmtC = n => fmtCurrencyCompact(n, currency)
 
-  const breakdown    = groupByCategory(transactions, txType)
-  const incomeTotal  = transactions.filter(t => t.type === 'income').reduce((a,t)  => a+t.amount, 0)
-  const expenseTotal = transactions.filter(t => t.type === 'expense').reduce((a,t) => a+t.amount, 0)
+  // Savings account names — used to exclude them from expenses
+  const savingsNames = savingsAccounts.map(s => s.name.toLowerCase())
+  const isSavingsTx  = t => savingsNames.some(n => t.subcategory?.toLowerCase() === n) ||
+    t.category?.toLowerCase().includes('saving')
 
+  // Filter transactions by tab
+  const expenseTxs = transactions.filter(t => t.type === 'expense' && !isSavingsTx(t))
+  const incomeTxs  = transactions.filter(t => t.type === 'income')
+
+  // Savings breakdown — each account as a "category"
+  const savingsBreakdown = (() => {
+    const totalSav = savingsAccounts.reduce((a, s) => a + (s.balance || 0), 0)
+    return savingsAccounts
+      .filter(s => s.balance > 0)
+      .sort((a, b) => b.balance - a.balance)
+      .map(s => ({
+        name:   s.name,
+        amount: s.balance,
+        pct:    totalSav > 0 ? Math.round((s.balance / totalSav) * 100) : 0,
+        icon:   s.icon || '💰',
+      }))
+  })()
+
+  // Loans breakdown — each loan as a "category"
+  const loansBreakdown = (() => {
+    const totalDebt = loans.reduce((a, l) => a + (l.remainingBalance || 0), 0)
+    return loans
+      .filter(l => l.remainingBalance > 0)
+      .sort((a, b) => b.remainingBalance - a.remainingBalance)
+      .map(l => ({
+        name:   l.name,
+        amount: l.remainingBalance,
+        pct:    totalDebt > 0 ? Math.round((l.remainingBalance / totalDebt) * 100) : 0,
+        icon:   l.icon || '🏦',
+      }))
+  })()
+
+  const breakdown = (() => {
+    if (txType === 'savings') return savingsBreakdown
+    if (txType === 'loans')   return loansBreakdown
+    const txs = txType === 'expense' ? expenseTxs : incomeTxs
+    return groupByCategory(txs, txType === 'expense' ? 'expense' : 'income')
+  })()
+
+  const totals = {
+    expense: expenseTxs.reduce((a,t) => a+t.amount, 0),
+    income:  incomeTxs.reduce((a,t)  => a+t.amount, 0),
+    savings: savingsAccounts.reduce((a,s) => a+(s.balance||0), 0),
+    loans:   loans.reduce((a,l) => a+(l.remainingBalance||0), 0),
+  }
+
+  // Drill into regular tx categories
   const catTxs = drillCat
-    ? transactions.filter(t => t.type === txType && t.category === drillCat)
+    ? (txType === 'expense' ? expenseTxs : incomeTxs)
+        .filter(t => t.category === drillCat)
     : []
 
   const subBreakdown = (() => {
-    if (!drillCat) return []
+    if (!drillCat || txType === 'savings' || txType === 'loans') return []
     const map = {}
     catTxs.forEach(t => {
       const k = t.subcategory?.trim() || '(no subcategory)'
-      map[k] = (map[k] || 0) + t.amount
+      map[k] = (map[k]||0) + t.amount
     })
     const sub = Object.values(map).reduce((a,b) => a+b, 0)
     return Object.entries(map).sort((a,b) => b[1]-a[1])
@@ -282,6 +335,13 @@ export default function Stats() {
     if (period === 'Monthly')  return format(anchor, 'MMMM yyyy')
     return `${customStart} → ${customEnd}`
   }
+
+  const TAB_CONFIG = [
+    { id: 'expense', label: 'Exp.',    activeClass: 'expense' },
+    { id: 'income',  label: 'Income',  activeClass: '' },
+    { id: 'savings', label: '💰 Sav.', activeClass: 'savings' },
+    { id: 'loans',   label: '🏦 Loans',activeClass: 'loans' },
+  ]
 
   return (
     <div className="screen stats-screen">
@@ -308,22 +368,20 @@ export default function Stats() {
         </div>
       </div>
 
-      {/* Income / Expense tabs */}
+      {/* 4-tab type selector */}
       <div className="stats-type-tabs">
-        <button
-          className={`stats-type-tab ${txType === 'income' ? 'active' : ''}`}
-          onClick={() => setTxType('income')}
-        >
-          <span className="stt-label">Income</span>
-          {txType === 'income' && <span className="stt-total">{fmt(incomeTotal)}</span>}
-        </button>
-        <button
-          className={`stats-type-tab ${txType === 'expense' ? 'active expense' : ''}`}
-          onClick={() => setTxType('expense')}
-        >
-          <span className="stt-label">Exp.</span>
-          {txType === 'expense' && <span className="stt-total">{fmt(expenseTotal)}</span>}
-        </button>
+        {TAB_CONFIG.map(tab => (
+          <button
+            key={tab.id}
+            className={`stats-type-tab ${txType === tab.id ? `active ${tab.activeClass}` : ''}`}
+            onClick={() => { setTxType(tab.id); setDrillCat(null); setDrillSub(null) }}
+          >
+            <span className="stt-label">{tab.label}</span>
+            {txType === tab.id && (
+              <span className="stt-total">{fmtC(totals[tab.id])}</span>
+            )}
+          </button>
+        ))}
       </div>
 
       <div className="scroll-area stats-scroll">
@@ -336,25 +394,29 @@ export default function Stats() {
           </div>
         ) : (
           <>
-            {/* Treemap */}
             <div className="treemap-wrap">
               <Treemap
-                data={breakdown}
-                colors={COLORS}
-                fmt={fmt}
-                fmtC={fmtC}
-                onSelect={d => { setDrillCat(d.name); setDrillSub(null) }}
+                data={breakdown} colors={COLORS}
+                fmt={fmt} fmtC={fmtC}
+                onSelect={d => {
+                  if (txType === 'expense' || txType === 'income') {
+                    setDrillCat(d.name); setDrillSub(null)
+                  }
+                }}
               />
             </div>
 
-            {/* Category list */}
             <div className="stats-cat-list">
               {breakdown.map((cat, i) => {
                 const catDef = categories.find(c => c.name === cat.name)
-                const icon   = catDef?.icon || ''
+                const icon   = cat.icon || catDef?.icon || ''
                 return (
                   <button key={cat.name} className="stats-cat-item"
-                    onClick={() => { setDrillCat(cat.name); setDrillSub(null) }}
+                    onClick={() => {
+                      if (txType === 'expense' || txType === 'income') {
+                        setDrillCat(cat.name); setDrillSub(null)
+                      }
+                    }}
                   >
                     <div className="stats-cat-swatch" style={{ background: COLORS[i % COLORS.length] }} />
                     <div className="stats-pct-badge" style={{ background: badgeColor(cat.pct) }}>
@@ -373,7 +435,7 @@ export default function Stats() {
         )}
       </div>
 
-      {/* Drill level 1 — subcategories */}
+      {/* Drill level 1 */}
       {drillCat && !drillSub && (
         <>
           <div className="sheet-overlay" onClick={() => setDrillCat(null)} />
@@ -398,7 +460,7 @@ export default function Stats() {
                   {subBreakdown.map((sub, i) => (
                     <button key={sub.name} className="drill-sub-row" onClick={() => setDrillSub(sub.name)}>
                       <div className="drill-sub-left">
-                        <div className="drill-sub-dot" style={{ background: COLORS[i % COLORS.length] }} />
+                        <div className="drill-sub-dot" style={{ background: COLORS[i%COLORS.length] }} />
                         <div>
                           <div className="drill-sub-name">{sub.name}</div>
                           <div className="drill-sub-amt">{fmt(sub.amount)}</div>
@@ -419,7 +481,7 @@ export default function Stats() {
         </>
       )}
 
-      {/* Drill level 2 — transactions */}
+      {/* Drill level 2 */}
       {drillCat && drillSub && (
         <>
           <div className="sheet-overlay" onClick={() => setDrillSub(null)} />
