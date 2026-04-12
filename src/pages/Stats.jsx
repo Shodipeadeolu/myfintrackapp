@@ -31,12 +31,13 @@ const badgeColor = (pct) => {
 }
 
 // ── Squarified Treemap ───────────────────────────────────────
+// Returns pixel-perfect rects that fill the entire container with no gaps
 function squarify(items, x, y, w, h) {
   if (!items.length || w <= 0 || h <= 0) return []
   const total = items.reduce((s, i) => s + i.value, 0)
   if (!total) return []
 
-  const results = []
+  const rows    = []   // each row: { isWide, x, y, w, h, items }
   let remaining = [...items]
   let rx = x, ry = y, rw = w, rh = h
 
@@ -63,21 +64,53 @@ function squarify(items, x, y, w, h) {
     const rowSum2  = rowItems.reduce((s, i) => s + i.value, 0)
     const rowArea  = (rowSum2 / total) * (rw * rh)
     const rowWidth = rowArea / rowLength
-    let offset = isWide ? ry : rx
 
-    rowItems.forEach(item => {
-      const itemLen = (item.value / rowSum2) * rowLength
-      const rect = isWide
-        ? { x: rx, y: offset, w: rowWidth, h: itemLen }
-        : { x: offset, y: ry, w: itemLen, h: rowWidth }
-      results.push({ ...item, ...rect })
-      offset += itemLen
-    })
-
+    rows.push({ isWide, rx, ry, rw, rh, rowWidth, rowSum2, items: rowItems })
     remaining = remaining.slice(rowItems.length)
     if (isWide) { rx += rowWidth; rw -= rowWidth }
     else        { ry += rowWidth; rh -= rowWidth }
   }
+
+  // Second pass: stretch each row's cross-axis to fill exactly remaining space
+  // This eliminates floating-point gaps completely
+  const results = []
+  let usedCross_x = x, usedCross_y = y
+
+  rows.forEach((row, rowIdx) => {
+    const isLast = rowIdx === rows.length - 1
+    const { isWide, items: rowItems, rowSum2 } = row
+
+    // Stretch the row's cross-axis to fill remaining space
+    const crossSize = isWide
+      ? (isLast ? (y + h) - usedCross_x : row.rowWidth)
+      : (isLast ? (y + h) - usedCross_y : row.rowWidth)
+
+    const rowX = isWide ? usedCross_x : row.ry
+    const rowY = isWide ? row.ry      : usedCross_y
+
+    let offset = isWide ? rowY : rowX
+    const mainSize = isWide ? row.rh : row.rw
+
+    rowItems.forEach((item, itemIdx) => {
+      const isLastItem = itemIdx === rowItems.length - 1
+      // Stretch last item to fill remaining main-axis space
+      const mainEnd = isWide ? rowY + mainSize : rowX + mainSize
+      const itemMain = isLastItem
+        ? mainEnd - offset
+        : (item.value / rowSum2) * mainSize
+
+      const rect = isWide
+        ? { x: rowX, y: offset, w: crossSize, h: itemMain }
+        : { x: offset, y: rowX, w: itemMain, h: crossSize }
+
+      results.push({ ...item, ...rect })
+      offset += itemMain
+    })
+
+    if (isWide) usedCross_x += crossSize
+    else        usedCross_y += crossSize
+  })
+
   return results
 }
 
