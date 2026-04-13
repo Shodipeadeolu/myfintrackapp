@@ -31,13 +31,12 @@ const badgeColor = (pct) => {
 }
 
 // ── Squarified Treemap ───────────────────────────────────────
-// Returns pixel-perfect rects that fill the entire container with no gaps
 function squarify(items, x, y, w, h) {
   if (!items.length || w <= 0 || h <= 0) return []
   const total = items.reduce((s, i) => s + i.value, 0)
   if (!total) return []
 
-  const rows    = []   // each row: { isWide, x, y, w, h, items }
+  const results = []
   let remaining = [...items]
   let rx = x, ry = y, rw = w, rh = h
 
@@ -64,53 +63,21 @@ function squarify(items, x, y, w, h) {
     const rowSum2  = rowItems.reduce((s, i) => s + i.value, 0)
     const rowArea  = (rowSum2 / total) * (rw * rh)
     const rowWidth = rowArea / rowLength
+    let offset = isWide ? ry : rx
 
-    rows.push({ isWide, rx, ry, rw, rh, rowWidth, rowSum2, items: rowItems })
+    rowItems.forEach(item => {
+      const itemLen = (item.value / rowSum2) * rowLength
+      const rect = isWide
+        ? { x: rx, y: offset, w: rowWidth, h: itemLen }
+        : { x: offset, y: ry, w: itemLen, h: rowWidth }
+      results.push({ ...item, ...rect })
+      offset += itemLen
+    })
+
     remaining = remaining.slice(rowItems.length)
     if (isWide) { rx += rowWidth; rw -= rowWidth }
     else        { ry += rowWidth; rh -= rowWidth }
   }
-
-  // Second pass: stretch each row's cross-axis to fill exactly remaining space
-  // This eliminates floating-point gaps completely
-  const results = []
-  let usedCross_x = x, usedCross_y = y
-
-  rows.forEach((row, rowIdx) => {
-    const isLast = rowIdx === rows.length - 1
-    const { isWide, items: rowItems, rowSum2 } = row
-
-    // Stretch the row's cross-axis to fill remaining space
-    const crossSize = isWide
-      ? (isLast ? (y + h) - usedCross_x : row.rowWidth)
-      : (isLast ? (y + h) - usedCross_y : row.rowWidth)
-
-    const rowX = isWide ? usedCross_x : row.ry
-    const rowY = isWide ? row.ry      : usedCross_y
-
-    let offset = isWide ? rowY : rowX
-    const mainSize = isWide ? row.rh : row.rw
-
-    rowItems.forEach((item, itemIdx) => {
-      const isLastItem = itemIdx === rowItems.length - 1
-      // Stretch last item to fill remaining main-axis space
-      const mainEnd = isWide ? rowY + mainSize : rowX + mainSize
-      const itemMain = isLastItem
-        ? mainEnd - offset
-        : (item.value / rowSum2) * mainSize
-
-      const rect = isWide
-        ? { x: rowX, y: offset, w: crossSize, h: itemMain }
-        : { x: offset, y: rowX, w: itemMain, h: crossSize }
-
-      results.push({ ...item, ...rect })
-      offset += itemMain
-    })
-
-    if (isWide) usedCross_x += crossSize
-    else        usedCross_y += crossSize
-  })
-
   return results
 }
 
@@ -122,44 +89,47 @@ function Treemap({ data, colors, fmt, fmtC, onSelect }) {
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
+    // Measure immediately on mount
+    const { width, height } = el.getBoundingClientRect()
+    if (width > 0 && height > 0) setDims({ w: Math.floor(width), h: Math.floor(height) })
+
     const obs = new ResizeObserver(entries => {
       const { width, height } = entries[0].contentRect
-      setDims({ w: Math.floor(width), h: Math.floor(height) })
+      if (width > 0 && height > 0)
+        setDims({ w: Math.floor(width), h: Math.floor(height) })
     })
     obs.observe(el)
     return () => obs.disconnect()
   }, [])
 
   const { w, h } = dims
-  const GAP = 2
+  const GAP = 3
 
   const items = data.map((d, i) => ({
-    ...d, value: d.amount, color: colors[i % colors.length], index: i,
+    ...d, value: d.amount, color: colors[i % colors.length],
   }))
 
-  const rects = (w > 0 && h > 0) ? squarify(items, 0, 0, w, h) : []
+  // Only compute rects when we have real dimensions
+  const rects = (w > 10 && h > 10) ? squarify(items, 0, 0, w, h) : []
 
   return (
     <div ref={containerRef} className="treemap-container">
       {rects.map((r) => {
-        const cw = r.w - GAP
-        const ch = r.h - GAP
-        if (cw <= 2 || ch <= 2) return null
+        const cw = Math.max(0, r.w - GAP)
+        const ch = Math.max(0, r.h - GAP)
+        if (cw < 8 || ch < 8) return null
 
-        // Adaptive font sizing based on cell dimensions
         const area    = cw * ch
         const minDim  = Math.min(cw, ch)
         const nameFz  = Math.min(14, Math.max(7,  minDim / 5.5))
         const pctFz   = Math.min(13, Math.max(7,  minDim / 6))
         const amtFz   = Math.min(11, Math.max(6.5, minDim / 7))
 
-        // Show/hide layers based on available area
-        const showName = cw >= 24 && ch >= 18
-        const showPct  = cw >= 30 && ch >= 28  && area >= 800
-        const showAmt  = cw >= 36 && ch >= 42  && area >= 1400
+        const showName = cw >= 28 && ch >= 20
+        const showPct  = cw >= 36 && ch >= 32 && area >= 1000
+        const showAmt  = cw >= 44 && ch >= 46 && area >= 1800
 
-        // Truncate based on px width (approx 6px per char at default size)
-        const maxChars = Math.max(2, Math.floor(cw / (nameFz * 0.6)))
+        const maxChars = Math.max(2, Math.floor(cw / (nameFz * 0.62)))
         const displayName = r.name.length > maxChars
           ? r.name.slice(0, maxChars - 1) + '…'
           : r.name
@@ -169,7 +139,8 @@ function Treemap({ data, colors, fmt, fmtC, onSelect }) {
             key={r.name}
             className="treemap-cell"
             style={{
-              left: r.x + GAP / 2, top: r.y + GAP / 2,
+              left: r.x + GAP / 2,
+              top:  r.y + GAP / 2,
               width: cw, height: ch,
               background: r.color,
             }}
@@ -177,19 +148,9 @@ function Treemap({ data, colors, fmt, fmtC, onSelect }) {
           >
             {showName && (
               <div className="treemap-label">
-                <div className="treemap-name" style={{ fontSize: nameFz }}>
-                  {displayName}
-                </div>
-                {showPct && (
-                  <div className="treemap-pct" style={{ fontSize: pctFz }}>
-                    {r.pct}%
-                  </div>
-                )}
-                {showAmt && (
-                  <div className="treemap-amt" style={{ fontSize: amtFz }}>
-                    {fmtC(r.amount)}
-                  </div>
-                )}
+                <div className="treemap-name" style={{ fontSize: nameFz }}>{displayName}</div>
+                {showPct && <div className="treemap-pct" style={{ fontSize: pctFz }}>{r.pct}%</div>}
+                {showAmt && <div className="treemap-amt" style={{ fontSize: amtFz }}>{fmtC(r.amount)}</div>}
               </div>
             )}
           </button>

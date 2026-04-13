@@ -78,13 +78,14 @@
 /* Treemap */
 .treemap-wrap {
   padding: 12px 14px 6px;
-  height: 340px;
   flex-shrink: 0;
 }
 
 .treemap-container {
   position: relative;
-  width: 100%; height: 100%;
+  width: 100%;
+  /* aspect-ratio ensures container has height from first paint */
+  aspect-ratio: 1.4 / 1;
   border-radius: var(--radius-md);
   overflow: hidden;
 }
@@ -189,3 +190,70 @@
 .drill-sub-right { display: flex; align-items: center; gap: 8px; }
 .drill-sub-arrow { font-size: 18px; color: var(--text-muted); }
 .pct-badge { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
+
+/* Secondary currency */
+.stats-type-row {
+  display: flex; align-items: flex-end; gap: 8px;
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px; flex-shrink: 0;
+}
+.stats-type-tabs {
+  display: flex; flex: 1;
+  border-bottom: none; margin: 0;
+}
+
+.sec-currency-btn {
+  display: flex; align-items: center; gap: 4px;
+  padding: 6px 10px; margin-bottom: 1px;
+  background: var(--bg-elevated); border: 1.5px solid var(--border);
+  border-radius: 20px; font-size: 12px; font-weight: 700;
+  color: var(--text-secondary); flex-shrink: 0; white-space: nowrap;
+  transition: all var(--transition);
+}
+.sec-currency-btn.active { border-color: var(--green); color: var(--green); background: var(--green-light); }
+.sec-currency-btn:active { opacity: 0.7; }
+.sec-sym    { font-size: 13px; font-weight: 800; }
+.sec-toggle { font-size: 12px; padding: 0 2px; }
+
+.sec-currency-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 20px; background: var(--green-light);
+  border-bottom: 1px solid rgba(0,196,140,0.2); flex-shrink: 0;
+  font-size: 12px; color: var(--green); font-weight: 500;
+}
+.sec-edit-btn { font-size: 11px; font-weight: 700; color: var(--green); text-decoration: underline; }
+
+/* Category list with secondary amount */
+.stats-cat-amount-col { text-align: right; flex-shrink: 0; }
+.stats-cat-amount     { font-size: 14px; font-weight: 700; color: var(--text-primary); white-space: nowrap; }
+.stats-cat-sec        { font-size: 11px; color: var(--text-muted); margin-top: 1px; white-space: nowrap; }
+.drill-sec            { color: var(--text-muted); font-size: 12px; }
+.sec-inline           { color: var(--text-muted); font-size: 11px; }
+
+/* Converter sheet */
+.conv-preview {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 20px; background: var(--bg-elevated); border-radius: var(--radius-lg);
+  margin-bottom: 20px; gap: 6px;
+}
+.conv-from          { font-size: 22px; font-weight: 800; color: var(--text-primary); }
+.conv-arrow         { font-size: 20px; color: var(--text-muted); }
+.conv-to            { font-size: 28px; font-weight: 800; color: var(--green); }
+.conv-currency-name { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+
+.conv-currency-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+}
+.conv-currency-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 10px 6px; background: var(--bg-elevated); border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); transition: all var(--transition);
+}
+.conv-currency-btn.selected { border-color: var(--green); background: var(--green-light); }
+.conv-currency-btn:active { transform: scale(0.95); }
+.conv-sym  { font-size: 16px; font-weight: 800; color: var(--text-primary); }
+.conv-code { font-size: 10px; font-weight: 600; color: var(--text-muted); }
+.conv-currency-btn.selected .conv-sym,
+.conv-currency-btn.selected .conv-code { color: var(--green); }
+
+.conv-rate-hint { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
