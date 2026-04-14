@@ -378,29 +378,34 @@ export default function Stats() {
         ))}
       </div>
 
-      <div className="scroll-area stats-scroll">
+      {/* Treemap — fixed height, always visible above scroll */}
+      <div className="treemap-wrap">
         {loading ? (
-          <div className="load-row"><span className="spinner" /></div>
+          <div className="treemap-loading"><span className="spinner" /></div>
         ) : breakdown.length === 0 ? (
-          <div className="empty-state" style={{ marginTop: 40 }}>
-            <span className="icon">📊</span>
-            <p>No {txType} data for {periodLabel()}.</p>
+          <div className="treemap-empty">
+            <span style={{ fontSize: 32, opacity: 0.3 }}>📊</span>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8 }}>
+              No {txType} data for {periodLabel()}
+            </p>
           </div>
         ) : (
-          <>
-            <div className="treemap-wrap">
-              <Treemap
-                data={breakdown} colors={COLORS}
-                fmt={fmt} fmtC={fmtC}
-                onSelect={d => {
-                  if (txType === 'expense' || txType === 'income') {
-                    setDrillCat(d.name); setDrillSub(null)
-                  }
-                }}
-              />
-            </div>
+          <Treemap
+            data={breakdown} colors={COLORS}
+            fmt={fmt} fmtC={fmtC}
+            onSelect={d => {
+              if (txType === 'expense' || txType === 'income') {
+                setDrillCat(d.name); setDrillSub(null)
+              }
+            }}
+          />
+        )}
+      </div>
 
-            <div className="stats-cat-list">
+      {/* Category list scrolls independently below treemap */}
+      <div className="stats-scroll">
+        {!loading && breakdown.length > 0 && (
+          <div className="stats-cat-list">
               {breakdown.map((cat, i) => {
                 const catDef = categories.find(c => c.name === cat.name)
                 const icon   = cat.icon || catDef?.icon || ''
@@ -424,8 +429,7 @@ export default function Stats() {
                   </button>
                 )
               })}
-            </div>
-          </>
+          </div>
         )}
       </div>
 
