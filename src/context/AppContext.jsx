@@ -1,38 +1,109 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import { onAuthStateChanged, signOut } from 'firebase/auth'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from '../firebase/config'
 import {
-  getUserProfile, setUserProfile,
-  getCategories, seedDefaultCategories,
-  getHousehold, getHouseholdInvites,
-  acceptInvite
+  getUserProfile, setUserProfile, getHousehold,
+  getCategories, getDefaultCategories, addCategory,
+  getPendingInvites, acceptHouseholdInvite
 } from '../firebase/service'
+import { logout as firebaseLogout } from '../firebase/auth'
 
 const AppContext = createContext(null)
+export const useApp = () => useContext(AppContext)
 
 export function AppProvider({ children }) {
-  const [user, setUser]               = useState(null)
-  const [profile, setProfile]         = useState(null)
-  const [authLoading, setAuthLoading] = useState(true)
-  const [dataLoading, setDataLoading] = useState(false)
-  const [reloadTrigger, setReloadTrigger] = useState(0)
-  const [theme, setTheme]             = useState(() => localStorage.getItem('ft-theme') || 'dark')
-  const [currency, setCurrencyState]  = useState(() => localStorage.getItem('ft-currency') || 'USD')
-  const [balanceRollover, setBalanceRolloverState] = useState(
-    () => localStorage.getItem('ft-balance-rollover') === 'true'
-  )
-  const [categories, setCategories]   = useState([])
-  const [household, setHousehold]     = useState(null)
+  const [user, setUser]                     = useState(null)
+  const [profile, setProfile]               = useState(null)
+  const [household, setHousehold]           = useState(null)
+  const [userRole, setUserRole]             = useState(null)
+  const [categories, setCategories]         = useState([])
   const [pendingInvites, setPendingInvites] = useState([])
+  const [authLoading, setAuthLoading]       = useState(true)
+  const [dataLoading, setDataLoading]       = useState(false)
+  const [reloadCounter, setReloadCounter]   = useState(0)
 
   // Theme
+  const [theme, setTheme] = useState(() => localStorage.getItem('ft-theme') || 'dark')
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('ft-theme', theme)
   }, [theme])
-  const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light')
+  const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
 
-  // Currency — persist to localStorage + Firestore profile
+  // Primary currency
+  const [currency, setCurrencyState] = useState(() => localStorage.getItem('ft-currency') || 'NGN')
+
+  // Balance rollover
+  const [balanceRollover, setBalanceRolloverState] = useState(
+    () => localStorage.getItem('ft-balance-rollover') === 'true'
+  )
+
+  // Secondary currency
+  const [secEnabled, setSecEnabledState] = useState(
+    () => localStorage.getItem('ft-sec-currency-enabled') === 'true'
+  )
+  const [secCurrency, setSecCurrencyState] = useState(
+    () => localStorage.getItem('ft-sec-currency') || 'USD'
+  )
+  const [secRate, setSecRateState] = useState(
+    () => parseFloat(localStorage.getItem('ft-sec-rate') || '0') || 0
+  )
+
+  // Permissions
+  const canWrite = !userRole || ['owner', 'all_access', 'record_edit'].includes(userRole)
+  const householdId = household?.id || null
+
+  // Trigger reload across pages
+  const triggerReload = () => setReloadCounter(c => c + 1)
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      setUser(u)
+      if (u) {
+        setDataLoading(true)
+        try {
+          const prof = await getUserProfile(u.uid)
+          setProfile(prof)
+
+          if (prof?.currency)         { setCurrencyState(prof.currency);         localStorage.setItem('ft-currency', prof.currency) }
+          if (prof?.balanceRollover !== undefined) { setBalanceRolloverState(prof.balanceRollover); localStorage.setItem('ft-balance-rollover', prof.balanceRollover ? 'true' : 'false') }
+          if (prof?.secEnabled !== undefined) { setSecEnabledState(prof.secEnabled); localStorage.setItem('ft-sec-currency-enabled', prof.secEnabled ? 'true' : 'false') }
+          if (prof?.secCurrency)      { setSecCurrencyState(prof.secCurrency);    localStorage.setItem('ft-sec-currency', prof.secCurrency) }
+          if (prof?.secRate)          { setSecRateState(prof.secRate);             localStorage.setItem('ft-sec-rate', String(prof.secRate)) }
+
+          if (prof?.householdId) {
+            const hh = await getHousehold(prof.householdId)
+            setHousehold(hh)
+            const member = hh?.members?.find(m => m.userId === u.uid)
+            setUserRole(member?.role || 'owner')
+          }
+
+          const cats = await getCategories(u.uid, prof?.householdId || null)
+          if (cats.length === 0) {
+            const defaults = await getDefaultCategories(u.uid)
+            setCategories(defaults)
+          } else {
+            setCategories(cats)
+          }
+
+          const invites = await getPendingInvites(u.email)
+          setPendingInvites(invites)
+        } catch (e) { console.error('App load error:', e) }
+        finally { setDataLoading(false) }
+      } else {
+        setProfile(null); setHousehold(null); setCategories([]); setPendingInvites([])
+      }
+      setAuthLoading(false)
+    })
+    return unsub
+  }, [])
+
+  const refreshCategories = async () => {
+    if (!user) return
+    const cats = await getCategories(user.uid, householdId)
+    setCategories(cats)
+  }
+
   const setCurrency = async (code, uid) => {
     setCurrencyState(code)
     localStorage.setItem('ft-currency', code)
@@ -45,115 +116,62 @@ export function AppProvider({ children }) {
     if (user) await setUserProfile(user.uid, { balanceRollover: val })
   }
 
-  // Auth
-  useEffect(() => {
-    return onAuthStateChanged(auth, (u) => {
-      setUser(u)
-      if (u) {
-        loadUserData(u)
-      } else {
-        setProfile(null); setCategories([]); setHousehold(null); setPendingInvites([])
-      }
-      setAuthLoading(false)
-    })
-  }, [])
-
-  const loadUserData = async (u, overrideHouseholdId) => {
-    setDataLoading(true)
-    try {
-      let prof = await getUserProfile(u.uid)
-      if (!prof) {
-        prof = { displayName: u.displayName || '', email: u.email, createdAt: new Date().toISOString() }
-        await setUserProfile(u.uid, prof)
-      }
-
-      // Load saved currency from profile
-      if (prof.currency) {
-        setCurrencyState(prof.currency)
-        localStorage.setItem('ft-currency', prof.currency)
-      }
-      // Load balance rollover setting from profile
-      if (prof.balanceRollover !== undefined) {
-        setBalanceRolloverState(prof.balanceRollover)
-        localStorage.setItem('ft-balance-rollover', prof.balanceRollover ? 'true' : 'false')
-      }
-
-      const hhId = overrideHouseholdId !== undefined
-        ? overrideHouseholdId
-        : (prof.householdId || null)
-
-      const mergedProf = { ...prof, householdId: hhId || undefined }
-      setProfile(mergedProf)
-
-      const [hh, cats, invites] = await Promise.all([
-        hhId ? getHousehold(hhId) : Promise.resolve(null),
-        getCategories(u.uid, hhId),
-        u.email ? getHouseholdInvites(u.email) : Promise.resolve([])
-      ])
-
-      setHousehold(hh)
-      setPendingInvites(invites)
-
-      if (cats.length === 0 && !hhId) {
-        await seedDefaultCategories(u.uid)
-        const fresh = await getCategories(u.uid, null)
-        setCategories(fresh)
-      } else {
-        setCategories(cats)
-      }
-    } catch (e) {
-      console.error('loadUserData error', e)
-    } finally {
-      setDataLoading(false)
-    }
+  const setSecEnabled = async (val) => {
+    setSecEnabledState(val)
+    localStorage.setItem('ft-sec-currency-enabled', val ? 'true' : 'false')
+    if (user) await setUserProfile(user.uid, { secEnabled: val })
   }
 
-  const refreshCategories = useCallback(async () => {
-    if (!user) return
-    const cats = await getCategories(user.uid, profile?.householdId || null)
-    setCategories(cats)
-  }, [user, profile])
+  const setSecCurrency = async (code) => {
+    setSecCurrencyState(code)
+    localStorage.setItem('ft-sec-currency', code)
+    if (user) await setUserProfile(user.uid, { secCurrency: code })
+  }
 
-  const refreshHousehold = useCallback(async () => {
-    if (!user || !profile?.householdId) return
-    const hh = await getHousehold(profile.householdId)
-    setHousehold(hh)
-  }, [user, profile])
+  const setSecRate = async (rate) => {
+    setSecRateState(rate)
+    localStorage.setItem('ft-sec-rate', String(rate))
+    if (user) await setUserProfile(user.uid, { secRate: rate })
+  }
+
+  // Convert primary amount to secondary
+  const convertToSec = useCallback((amount) => {
+    if (!secEnabled || !secRate || secRate <= 0) return null
+    return amount / secRate
+  }, [secEnabled, secRate])
 
   const handleAcceptInvite = async (invite) => {
-    await acceptInvite(invite.id, invite, user.uid)
-    await setUserProfile(user.uid, { householdId: invite.householdId })
+    if (!user) return
+    await acceptHouseholdInvite(user.uid, user.email, invite)
+    const hh = await getHousehold(invite.householdId)
+    setHousehold(hh)
+    const member = hh?.members?.find(m => m.userId === user.uid)
+    setUserRole(member?.role || 'view')
     setPendingInvites(prev => prev.filter(i => i.id !== invite.id))
-    await loadUserData(user, invite.householdId)
+    triggerReload()
   }
 
-  const logout = () => signOut(auth)
-
-  const householdId = profile?.householdId || null
-  const userRole = household
-    ? (household.members.find(m => m.userId === user?.uid)?.role || 'view-only')
-    : 'owner'
-  const canWrite = ['owner', 'all-access', 'record-edit'].includes(userRole)
+  const logout = async () => {
+    await firebaseLogout()
+    setUser(null); setProfile(null); setHousehold(null)
+    setUserRole(null); setCategories([]); setPendingInvites([])
+  }
 
   return (
     <AppContext.Provider value={{
-      user, profile, authLoading, dataLoading,
-      reloadTrigger,
-      triggerReload: () => setReloadTrigger(n => n + 1),
-      theme, toggleTheme,
-      currency,
-      setCurrency: (code) => setCurrency(code, user?.uid),
-      balanceRollover,
-      setBalanceRollover,
-      categories, setCategories, refreshCategories,
-      household, householdId, userRole, canWrite, refreshHousehold,
+      user, profile, household, userRole, householdId,
+      authLoading, dataLoading, categories,
       pendingInvites, handleAcceptInvite,
-      logout,
-      reloadUser: (overrideHouseholdId) => user && loadUserData(user, overrideHouseholdId)
+      canWrite, theme, toggleTheme,
+      currency, setCurrency: (code) => setCurrency(code, user?.uid),
+      balanceRollover, setBalanceRollover,
+      secEnabled, setSecEnabled,
+      secCurrency, setSecCurrency,
+      secRate, setSecRate, convertToSec,
+      reloadTrigger: reloadCounter, triggerReload,
+      refreshCategories, logout,
     }}>
       {children}
     </AppContext.Provider>
   )
 }
-
-export const useApp = () => useContext(AppContext)
