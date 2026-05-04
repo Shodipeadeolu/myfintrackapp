@@ -1,12 +1,11 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { onAuthStateChanged } from 'firebase/auth'
+import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { auth } from '../firebase/config'
 import {
   getUserProfile, setUserProfile, getHousehold,
   getCategories, getDefaultCategories, addCategory,
   getPendingInvites, acceptHouseholdInvite
 } from '../firebase/service'
-import { logout as firebaseLogout } from '../firebase/auth'
 
 const AppContext = createContext(null)
 export const useApp = () => useContext(AppContext)
@@ -152,7 +151,7 @@ export function AppProvider({ children }) {
   }
 
   const logout = async () => {
-    await firebaseLogout()
+    await signOut(auth)
     setUser(null); setProfile(null); setHousehold(null)
     setUserRole(null); setCategories([]); setPendingInvites([])
   }
