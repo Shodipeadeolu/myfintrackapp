@@ -6,6 +6,7 @@ import HouseholdManager from '../components/HouseholdManager'
 import ImportSheet from '../components/ImportSheet'
 import CurrencyPicker from '../components/CurrencyPicker'
 import AppUpdateSheet from '../components/AppUpdateSheet'
+import SecondaryCurrencySheet from '../components/SecondaryCurrencySheet'
 import './Profile.css'
 
 const CURRENCY_NAMES = {
@@ -16,40 +17,59 @@ const CURRENCY_NAMES = {
   INR:'Indian Rupee', BRL:'Brazilian Real', SGD:'Singapore Dollar',
 }
 
-export default function Profile({ initialTab }) {
-  const { user, profile, household, userRole, logout, currency, balanceRollover, setBalanceRollover } = useApp()
+const SYMS = {
+  NGN:'₦', USD:'$', EUR:'€', GBP:'£', GHS:'₵', KES:'KSh', ZAR:'R',
+  AED:'AED', SAR:'SAR', CAD:'CA$', AUD:'A$', JPY:'¥', CNY:'¥',
+  INR:'₹', BRL:'R$', SGD:'S$', CHF:'CHF',
+}
+
+export default function Profile() {
+  const {
+    user, profile, household, userRole, logout, currency,
+    balanceRollover, setBalanceRollover,
+    secEnabled, setSecEnabled, secCurrency, setSecCurrency, secRate, setSecRate,
+  } = useApp()
   const update = useAppUpdate()
-  const [activeSheet, setActiveSheet] = useState(initialTab || null)
+  const [activeSheet, setActiveSheet] = useState(null)
 
   const initials = (profile?.displayName || user?.email || 'U')
     .split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
 
   const currencyLabel = CURRENCY_NAMES[currency] || currency
+  const secSym = SYMS[secCurrency] || secCurrency
 
   const menuItems = [
     {
       id: 'currency',
       icon: '💱',
       label: 'Currency',
-      desc: `${currency} · ${currencyLabel}`
+      desc: `${currency} · ${currencyLabel}`,
+    },
+    {
+      id: 'sec-currency',
+      icon: '🔁',
+      label: 'Secondary Currency',
+      desc: secEnabled
+        ? `On · ${secCurrency} (${secSym}) @ ${(SYMS[currency]||currency)}${secRate?.toLocaleString?.() ?? secRate} per ${secSym}`
+        : 'Off — show only primary currency',
     },
     {
       id: 'types',
       icon: '⊞',
       label: 'Transaction Types',
-      desc: 'Manage categories & subcategories'
+      desc: 'Manage categories & subcategories',
     },
     {
       id: 'household',
       icon: '🏠',
       label: 'Household',
-      desc: household ? household.name : 'Create or join a household'
+      desc: household ? household.name : 'Create or join a household',
     },
     {
       id: 'import',
       icon: '📥',
       label: 'Import Transactions',
-      desc: 'Upload an XLSX file'
+      desc: 'Upload an XLSX file',
     },
     {
       id: 'rollover',
@@ -58,15 +78,16 @@ export default function Profile({ initialTab }) {
       desc: balanceRollover ? 'On — closing balance carries forward' : 'Off — each month starts fresh',
       toggle: true,
       toggleValue: balanceRollover,
+      onToggle: () => setBalanceRollover(!balanceRollover),
     },
     {
       id: 'update',
-      icon: '🔄',
+      icon: '🔃',
       label: 'App Update',
       desc: update.updateAvailable
         ? '🟢 Update available!'
         : `v${update.version} · Last checked ${update.lastChecked}`,
-      badge: update.updateAvailable
+      badge: update.updateAvailable,
     },
   ]
 
@@ -97,7 +118,7 @@ export default function Profile({ initialTab }) {
                 </div>
                 <button
                   className={`profile-toggle ${item.toggleValue ? 'on' : 'off'}`}
-                  onClick={() => setBalanceRollover(!item.toggleValue)}
+                  onClick={item.onToggle}
                 >
                   <div className="profile-toggle-knob" />
                 </button>
@@ -132,12 +153,22 @@ export default function Profile({ initialTab }) {
         </div>
       </div>
 
-      {activeSheet === 'currency'  && <CurrencyPicker onClose={() => setActiveSheet(null)} />}
-      {activeSheet === 'types'     && <CategoryManager onClose={() => setActiveSheet(null)} />}
-      {activeSheet === 'household' && <HouseholdManager onClose={() => setActiveSheet(null)} />}
-      {activeSheet === 'import'    && <ImportSheet onClose={() => setActiveSheet(null)} />}
-      {activeSheet === 'update'    && (
-        <AppUpdateSheet onClose={() => setActiveSheet(null)} update={update} />
+      {activeSheet === 'currency'     && <CurrencyPicker onClose={() => setActiveSheet(null)} />}
+      {activeSheet === 'types'        && <CategoryManager onClose={() => setActiveSheet(null)} />}
+      {activeSheet === 'household'    && <HouseholdManager onClose={() => setActiveSheet(null)} />}
+      {activeSheet === 'import'       && <ImportSheet onClose={() => setActiveSheet(null)} />}
+      {activeSheet === 'update'       && <AppUpdateSheet onClose={() => setActiveSheet(null)} update={update} />}
+      {activeSheet === 'sec-currency' && (
+        <SecondaryCurrencySheet
+          onClose={() => setActiveSheet(null)}
+          secEnabled={secEnabled}
+          toggleSec={setSecEnabled}
+          secCurrency={secCurrency}
+          setSecCurrency={setSecCurrency}
+          secRate={secRate}
+          setSecRate={setSecRate}
+          primaryCurrency={currency}
+        />
       )}
     </div>
   )
