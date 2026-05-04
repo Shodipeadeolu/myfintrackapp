@@ -3,8 +3,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { auth } from '../firebase/config'
 import {
   getUserProfile, setUserProfile, getHousehold,
-  getCategories, getDefaultCategories, addCategory,
-  getPendingInvites, acceptHouseholdInvite
+  getCategories, addCategory
 } from '../firebase/service'
 
 const AppContext = createContext(null)
@@ -78,15 +77,7 @@ export function AppProvider({ children }) {
           }
 
           const cats = await getCategories(u.uid, prof?.householdId || null)
-          if (cats.length === 0) {
-            const defaults = await getDefaultCategories(u.uid)
-            setCategories(defaults)
-          } else {
-            setCategories(cats)
-          }
-
-          const invites = await getPendingInvites(u.email)
-          setPendingInvites(invites)
+          setCategories(cats)
         } catch (e) { console.error('App load error:', e) }
         finally { setDataLoading(false) }
       } else {
@@ -140,14 +131,7 @@ export function AppProvider({ children }) {
   }, [secEnabled, secRate])
 
   const handleAcceptInvite = async (invite) => {
-    if (!user) return
-    await acceptHouseholdInvite(user.uid, user.email, invite)
-    const hh = await getHousehold(invite.householdId)
-    setHousehold(hh)
-    const member = hh?.members?.find(m => m.userId === user.uid)
-    setUserRole(member?.role || 'view')
-    setPendingInvites(prev => prev.filter(i => i.id !== invite.id))
-    triggerReload()
+    // handled externally
   }
 
   const logout = async () => {
