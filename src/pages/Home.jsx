@@ -1,15 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import { getTransactions } from '../firebase/service'
-import { getSavingsAccounts } from '../firebase/savingsLoans'
 import { fmtCurrency, fmtCurrencyCompact, toFirestoreDate } from '../utils/helpers'
+import { fmtSec } from '../utils/secCurrency'
 import { startOfMonth, endOfMonth } from 'date-fns'
 import MonthNavigator from '../components/MonthNavigator'
 import TransactionItem from '../components/TransactionItem'
 import AddTransaction from '../components/AddTransaction'
-import InviteBanner from '../components/InviteBanner'
 import DailySummary from '../components/DailySummary'
-import SavingsLoansSheet from '../components/SavingsLoansSheet'
 import './Home.css'
 
 function firstName(profile, user) {
@@ -18,17 +16,20 @@ function firstName(profile, user) {
 }
 
 export default function Home({ onNavigate }) {
-  const { user, profile, householdId, categories, pendingInvites, handleAcceptInvite,
-          theme, toggleTheme, household, dataLoading, reloadTrigger, currency, balanceRollover } = useApp()
+  const {
+    user, profile, householdId, categories,
+    theme, toggleTheme, household, dataLoading,
+    reloadTrigger, currency,
+    balanceRollover,
+    secEnabled, secCurrency, secRate
+  } = useApp()
 
   const [month, setMonth]               = useState(new Date())
   const [transactions, setTransactions] = useState([])
   const [prevBalance, setPrevBalance]   = useState(0)
-  const [totalSavings, setTotalSavings] = useState(0)
   const [loading, setLoading]           = useState(false)
   const [showAdd, setShowAdd]           = useState(false)
   const [editTx, setEditTx]             = useState(null)
-  const [showSavings, setShowSavings]   = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -39,7 +40,7 @@ export default function Home({ onNavigate }) {
     if (!user) return
     setLoading(true)
     try {
-      const [txs, prevTxs, savAccts] = await Promise.all([
+      const [txs, prevTxs] = await Promise.all([
         getTransactions(user.uid, householdId,
           toFirestoreDate(startOfMonth(month)),
           toFirestoreDate(endOfMonth(month))
@@ -47,8 +48,7 @@ export default function Home({ onNavigate }) {
         balanceRollover
           ? getTransactions(user.uid, householdId, '2000-01-01',
               toFirestoreDate(new Date(month.getFullYear(), month.getMonth(), 0)))
-          : Promise.resolve([]),
-        getSavingsAccounts(user.uid, householdId)
+          : Promise.resolve([])
       ])
       setTransactions(txs)
       if (balanceRollover) {
@@ -57,7 +57,6 @@ export default function Home({ onNavigate }) {
       } else {
         setPrevBalance(0)
       }
-      setTotalSavings(savAccts.reduce((a, s) => a + (s.balance || 0), 0))
     } catch (e) { console.error('Home load error:', e) }
     finally { setLoading(false) }
   }
@@ -65,9 +64,12 @@ export default function Home({ onNavigate }) {
   const income   = transactions.filter(t => t.type === 'income').reduce((a, t) => a + t.amount, 0)
   const expenses = transactions.filter(t => t.type === 'expense').reduce((a, t) => a + t.amount, 0)
   const balance  = prevBalance + income - expenses
+  const savings  = balance > 0 ? balance : 0
   const recent   = transactions.slice(0, 5)
-  const fmt      = n => fmtCurrency(n, currency)
-  const fmtC     = n => fmtCurrencyCompact(n, currency)
+
+  const fmt  = n => fmtCurrency(n, currency)
+  const fmtC = n => fmtCurrencyCompact(n, currency)
+  const sec  = n => fmtSec(n, secEnabled, secRate, secCurrency)
 
   const handleSaved = () => { setShowAdd(false); setEditTx(null); load() }
 
@@ -85,47 +87,39 @@ export default function Home({ onNavigate }) {
           </button>
         </div>
 
-        {pendingInvites.map(invite => (
-          <InviteBanner key={invite.id} invite={invite} onAccept={handleAcceptInvite} />
-        ))}
-
         {/* Balance card */}
         <div className="balance-card">
           <div className="balance-nav-row">
             <MonthNavigator date={month} onChange={setMonth} />
           </div>
           <div className="balance-label-row">
-            <div className="balance-label">Total Balance</div>
+            <div className="balance-label">TOTAL BALANCE</div>
             {balanceRollover && <div className="rollover-badge">↩ Rollover On</div>}
           </div>
           <div className={`balance-amount ${balance < 0 ? 'negative' : ''}`}>{fmt(balance)}</div>
+          {sec(balance) && <div className="balance-sec">{sec(balance)}</div>}
           <div className="balance-change">
             <span className={balance >= 0 ? 'change-up' : 'change-down'}>
-              {balance >= 0 ? '↗' : '↘'} {fmt(Math.abs(expenses))}
+              {balance >= 0 ? '↗' : '↘'} {fmtC(Math.abs(expenses))}
             </span>
             <span className="change-label"> expenses this month</span>
           </div>
         </div>
 
-        {/* 3 stat cards — Savings is now a button */}
+        {/* 3 stat cards */}
         <div className="home-stat-cards">
-          <div className="stat-card income-card">
-            <div className="stat-card-icon income-icon">↗</div>
-            <div className="stat-card-label">Income</div>
-            <div className="stat-card-value income-val">{fmtC(income)}</div>
-          </div>
-          <div className="stat-card expense-card">
-            <div className="stat-card-icon expense-icon">↘</div>
-            <div className="stat-card-label">Expenses</div>
-            <div className="stat-card-value expense-val">{fmtC(expenses)}</div>
-          </div>
-          {/* Savings — tappable */}
-          <button className="stat-card savings-card savings-btn" onClick={() => setShowSavings(true)}>
-            <div className="stat-card-icon savings-icon">🐖</div>
-            <div className="stat-card-label">Savings</div>
-            <div className="stat-card-value savings-val">{fmtC(totalSavings)}</div>
-            <div className="savings-tap-hint">Tap to manage →</div>
-          </button>
+          {[
+            { label: 'Income',   val: income,   cls: 'income-card',  valCls: 'income-val',  icon: '↗', iconCls: 'income-icon'  },
+            { label: 'Expenses', val: expenses, cls: 'expense-card', valCls: 'expense-val', icon: '↘', iconCls: 'expense-icon' },
+            { label: 'Savings',  val: savings,  cls: 'savings-card', valCls: 'savings-val', icon: '🐖',iconCls: 'savings-icon' },
+          ].map(({ label, val, cls, valCls, icon, iconCls }) => (
+            <div key={label} className={`stat-card ${cls}`}>
+              <div className={`stat-card-icon ${iconCls}`}>{icon}</div>
+              <div className="stat-card-label">{label}</div>
+              <div className={`stat-card-value ${valCls}`}>{fmtC(val)}</div>
+              {sec(val) && <div className="stat-card-sec">{sec(val)}</div>}
+            </div>
+          ))}
         </div>
 
         {/* Daily Summary */}
@@ -180,10 +174,6 @@ export default function Home({ onNavigate }) {
           onClose={() => { setShowAdd(false); setEditTx(null) }}
           onSaved={handleSaved}
         />
-      )}
-
-      {showSavings && (
-        <SavingsLoansSheet onClose={() => { setShowSavings(false); load() }} />
       )}
     </div>
   )

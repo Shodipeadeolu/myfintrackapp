@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import { getTransactions } from '../firebase/service'
 import { fmtCurrency, fmtCurrencyCompact, toFirestoreDate } from '../utils/helpers'
+import { fmtSec } from '../utils/secCurrency'
 import { startOfMonth, endOfMonth } from 'date-fns'
 import MonthNavigator from '../components/MonthNavigator'
 import TransactionItem from '../components/TransactionItem'
@@ -9,13 +10,16 @@ import AddTransaction from '../components/AddTransaction'
 import './Transactions.css'
 
 export default function Transactions() {
-  const { user, householdId, categories, reloadTrigger, currency } = useApp()
-  const [month, setMonth]             = useState(new Date())
+  const {
+    user, householdId, categories, reloadTrigger, currency,
+    secEnabled, secCurrency, secRate
+  } = useApp()
+  const [month, setMonth]               = useState(new Date())
   const [transactions, setTransactions] = useState([])
-  const [loading, setLoading]         = useState(true)
-  const [filter, setFilter]           = useState('all')
-  const [search, setSearch]           = useState('')
-  const [editTx, setEditTx]           = useState(null)
+  const [loading, setLoading]           = useState(true)
+  const [filter, setFilter]             = useState('all')
+  const [search, setSearch]             = useState('')
+  const [editTx, setEditTx]             = useState(null)
 
   useEffect(() => { load() }, [month, householdId, reloadTrigger])
 
@@ -35,12 +39,15 @@ export default function Transactions() {
     .filter(t => !search || [t.category, t.subcategory, t.note]
       .some(f => f?.toLowerCase().includes(search.toLowerCase())))
 
-  const totalIncome   = transactions.filter(t => t.type === 'income').reduce((a, t)  => a + t.amount, 0)
-  const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((a, t) => a + t.amount, 0)
-  const fmt = n => fmtCurrency(n, currency)
+  const totalIncome   = transactions.filter(t => t.type === 'income').reduce((a,t)  => a+t.amount, 0)
+  const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((a,t) => a+t.amount, 0)
 
-  const grouped    = filtered.reduce((acc, tx) => { if (!acc[tx.date]) acc[tx.date] = []; acc[tx.date].push(tx); return acc }, {})
-  const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a))
+  const fmt  = n => fmtCurrency(n, currency)
+  const fmtC = n => fmtCurrencyCompact(n, currency)
+  const sec  = n => fmtSec(n, secEnabled, secRate, secCurrency)
+
+  const grouped     = filtered.reduce((acc, tx) => { if (!acc[tx.date]) acc[tx.date] = []; acc[tx.date].push(tx); return acc }, {})
+  const sortedDates = Object.keys(grouped).sort((a,b) => b.localeCompare(a))
 
   const exportCSV = () => {
     const rows = [
@@ -62,7 +69,7 @@ export default function Transactions() {
       </div>
       <div className="txns-subtitle">View and manage all your financial transactions</div>
 
-      {/* 3 summary cards */}
+      {/* 3 summary cards with secondary currency */}
       <div className="txns-summary">
         <div className="txns-stat-card">
           <div className="txns-stat-label">Total</div>
@@ -70,15 +77,16 @@ export default function Transactions() {
         </div>
         <div className="txns-stat-card income-bg">
           <div className="txns-stat-label">Total Income</div>
-          <div className="txns-stat-val income">+{fmtCurrencyCompact(totalIncome, currency)}</div>
+          <div className="txns-stat-val income">+{fmtC(totalIncome)}</div>
+          {sec(totalIncome) && <div className="txns-stat-sec">{sec(totalIncome)}</div>}
         </div>
         <div className="txns-stat-card expense-bg">
           <div className="txns-stat-label">Total Expenses</div>
-          <div className="txns-stat-val expense">-{fmtCurrencyCompact(totalExpenses, currency)}</div>
+          <div className="txns-stat-val expense">-{fmtC(totalExpenses)}</div>
+          {sec(totalExpenses) && <div className="txns-stat-sec">{sec(totalExpenses)}</div>}
         </div>
       </div>
 
-      {/* Filters */}
       <div className="txns-filters">
         <div className="search-row">
           <div className="search-box">
@@ -117,11 +125,8 @@ export default function Transactions() {
       </div>
 
       {editTx && (
-        <AddTransaction
-          tx={editTx}
-          onClose={() => setEditTx(null)}
-          onSaved={() => { setEditTx(null); load() }}
-        />
+        <AddTransaction tx={editTx} onClose={() => setEditTx(null)}
+          onSaved={() => { setEditTx(null); load() }} />
       )}
     </div>
   )

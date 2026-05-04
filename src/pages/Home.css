@@ -1,4 +1,3 @@
-/* Header */
 .home-header {
   display: flex; align-items: flex-start; justify-content: space-between;
   padding: 20px 20px 8px;
@@ -6,9 +5,9 @@
 .home-greeting  { font-size: 22px; font-weight: 800; color: var(--text-primary); line-height: 1.2; }
 .home-subtitle  { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
 .theme-btn {
-  width: 38px; height: 38px; border-radius: 50%; background: var(--bg-elevated);
-  font-size: 18px; display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; transition: transform var(--transition);
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--bg-elevated); font-size: 18px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .theme-btn:active { transform: scale(0.88); }
 
@@ -21,13 +20,10 @@
 }
 .balance-card::before {
   content: ''; position: absolute; top: -30px; right: -30px;
-  width: 150px; height: 150px; border-radius: 50%; background: rgba(255,255,255,0.08);
+  width: 150px; height: 150px; border-radius: 50%;
+  background: rgba(255,255,255,0.08);
 }
-.balance-nav-row { position: relative; z-index: 1; margin-bottom: 16px; }
-.balance-nav-row .month-nav .month-label { color: rgba(255,255,255,0.9); }
-.balance-nav-row .month-nav .month-btn   { background: rgba(255,255,255,0.2); color: rgba(255,255,255,0.9); }
-.balance-nav-row .month-nav .month-btn:disabled { opacity: 0.3; }
-
+.balance-nav-row  { position: relative; z-index: 1; margin-bottom: 16px; }
 .balance-label-row { display: flex; align-items: center; gap: 8px; position: relative; z-index: 1; }
 .balance-label {
   font-size: 12px; font-weight: 600; opacity: 0.8;
@@ -39,11 +35,19 @@
   padding: 2px 8px; border-radius: 20px;
 }
 .balance-amount {
-  font-size: clamp(24px, 7vw, 36px); font-weight: 800; margin: 6px 0 8px;
-  position: relative; z-index: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: clamp(24px, 7vw, 36px); font-weight: 800;
+  margin: 6px 0 0; position: relative; z-index: 1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .balance-amount.negative { color: #ffd5d5; }
-.balance-change { font-size: 13px; position: relative; z-index: 1; opacity: 0.85; }
+/* Secondary currency below balance */
+.balance-sec {
+  font-size: 14px; font-weight: 600;
+  color: rgba(255,255,255,0.7);
+  margin: 2px 0 8px;
+  position: relative; z-index: 1;
+}
+.balance-change { font-size: 13px; position: relative; z-index: 1; opacity: 0.85; margin-top: 4px; }
 .change-up   { color: #fff; font-weight: 700; }
 .change-down { color: #ffd5d5; font-weight: 700; }
 .change-label { opacity: 0.75; }
@@ -52,7 +56,7 @@
 .home-stat-cards { display: flex; gap: 10px; padding: 0 20px 4px; }
 .stat-card {
   flex: 1; border-radius: var(--radius-md); padding: 14px 12px;
-  display: flex; flex-direction: column; gap: 5px; min-width: 0;
+  display: flex; flex-direction: column; gap: 4px; min-width: 0;
 }
 .income-card  { background: var(--green-dim);  border: 1px solid rgba(0,196,140,0.2); }
 .expense-card { background: var(--red-light);   border: 1px solid rgba(239,68,68,0.2); }
@@ -69,17 +73,18 @@
 
 .stat-card-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
 .stat-card-value {
-  font-size: clamp(14px, 4vw, 18px); font-weight: 800;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.02em;
+  font-size: clamp(12px, 3.5vw, 15px); font-weight: 800;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .income-val  { color: var(--green); }
 .expense-val { color: var(--red); }
-.savings-val { color: var(--blue); }
-
-/* Savings card tappable */
-.savings-btn { cursor: pointer; transition: transform var(--transition), opacity var(--transition); text-align: left; }
-.savings-btn:active { transform: scale(0.95); opacity: 0.85; }
-.savings-tap-hint { font-size: 9px; color: var(--blue); font-weight: 600; opacity: 0.8; }
+.savings-val { color: #4a80e8; }
+/* Secondary currency on stat cards */
+.stat-card-sec {
+  font-size: 10px; font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* Quick actions */
 .quick-actions { display: flex; gap: 10px; padding: 16px 20px 8px; }
@@ -92,10 +97,11 @@
 .qa-btn:active { transform: scale(0.94); }
 .qa-icon { font-size: 20px; color: var(--text-primary); }
 
-/* Home section */
+/* Sections */
 .home-section { padding: 8px 20px 20px; }
-.home-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-.home-section-title  { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+.home-section-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
+}
+.home-section-title { font-size: 16px; font-weight: 700; color: var(--text-primary); }
 .view-all-btn { font-size: 13px; font-weight: 600; color: var(--green); }
 .recent-list  { display: flex; flex-direction: column; gap: 2px; }
-.load-row     { display: flex; justify-content: center; padding: 32px; }
