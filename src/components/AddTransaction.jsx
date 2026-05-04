@@ -19,25 +19,25 @@ export default function AddTransaction({ tx, onClose, onSaved }) {
   const { user, householdId, categories, canWrite, currency } = useApp()
   const editing = !!tx
 
-  const [type, setType]           = useState(tx?.type || 'expense')
-  const [amount, setAmount]       = useState(tx?.amount ? String(tx.amount) : '')
-  const [category, setCategory]   = useState(tx?.category || '')
+  const [type, setType]               = useState(tx?.type || 'expense')
+  const [amount, setAmount]           = useState(tx?.amount ? String(tx.amount) : '')
+  const [category, setCategory]       = useState(tx?.category || '')
   const [subcategory, setSubcategory] = useState(tx?.subcategory || '')
-  const [date, setDate]           = useState(tx?.date || toFirestoreDate(new Date()))
-  const [note, setNote]           = useState(tx?.note || '')
-  const [saving, setSaving]       = useState(false)
-  const [deleting, setDeleting]   = useState(false)
+  const [date, setDate]               = useState(tx?.date || toFirestoreDate(new Date()))
+  const [note, setNote]               = useState(tx?.note || '')
+  const [saving, setSaving]           = useState(false)
+  const [deleting, setDeleting]       = useState(false)
+  const [duplicating, setDuplicating] = useState(false)
   const [showCatPicker, setShowCatPicker] = useState(false)
   const [showSubPicker, setShowSubPicker] = useState(false)
-  const [err, setErr]             = useState('')
-  const [toast, setToast]         = useState(null)
+  const [err, setErr]                 = useState('')
+  const [toast, setToast]             = useState(null)
 
   const filteredCats = categories.filter(c => c.type === type)
   const selectedCat  = categories.find(c => c.name === category)
   const subcats      = selectedCat?.subcategories || []
 
-  // Only clear category/subcategory when user actively toggles the type
-  // Use a ref to skip the initial mount firing
+  // Only clear category when user actively toggles type, not on mount
   const prevType = useRef(type)
   useEffect(() => {
     if (prevType.current !== type) {
@@ -66,9 +66,29 @@ export default function AddTransaction({ tx, onClose, onSaved }) {
         setToast({ msg: 'Transaction saved!', type: 'success' })
       }
       setTimeout(() => onSaved(), 800)
-    } catch (e) {
+    } catch {
       setErr('Save failed. Try again.')
       setSaving(false)
+    }
+  }
+
+  // Duplicate: clone this transaction with today's date, then save
+  const handleDuplicate = async () => {
+    if (!amount || isNaN(parseFloat(amount))) return setErr('Enter a valid amount')
+    if (!category) return setErr('Pick a category')
+    setErr(''); setDuplicating(true)
+    try {
+      const data = {
+        type, amount: parseFloat(amount), category, subcategory,
+        date: toFirestoreDate(new Date()), // always today
+        note: note.trim()
+      }
+      await addTransaction(user.uid, householdId, data)
+      setToast({ msg: 'Duplicated with today\'s date!', type: 'success' })
+      setTimeout(() => onSaved(), 800)
+    } catch {
+      setErr('Duplicate failed.')
+      setDuplicating(false)
     }
   }
 
@@ -87,7 +107,6 @@ export default function AddTransaction({ tx, onClose, onSaved }) {
   return (
     <>
       {toast && <Toast message={toast.msg} type={toast.type} onDone={() => setToast(null)} />}
-
       <div className="sheet-overlay" onClick={onClose} />
       <div className="sheet">
         <div className="sheet-handle" />
@@ -158,12 +177,28 @@ export default function AddTransaction({ tx, onClose, onSaved }) {
           {err && <p className="form-err">{err}</p>}
 
           {canWrite && (
-            <button
-              className="btn btn-primary btn-full save-btn"
-              onClick={handleSave} disabled={saving}
-            >
-              {saving ? <span className="spinner" /> : editing ? 'Save Changes' : 'Add Transaction'}
-            </button>
+            <>
+              <button
+                className="btn btn-primary btn-full save-btn"
+                onClick={handleSave} disabled={saving || duplicating}
+              >
+                {saving ? <span className="spinner" /> : editing ? 'Save Changes' : 'Add Transaction'}
+              </button>
+
+              {/* Duplicate button — only shown when editing */}
+              {editing && (
+                <button
+                  className="btn btn-secondary btn-full duplicate-btn"
+                  onClick={handleDuplicate}
+                  disabled={saving || duplicating}
+                >
+                  {duplicating
+                    ? <span className="spinner" />
+                    : <><span>⧉</span> Duplicate with Today's Date</>
+                  }
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
