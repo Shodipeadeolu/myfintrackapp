@@ -14,6 +14,14 @@ import './Stats.css'
 
 const PERIOD_OPTIONS = ['Weekly', 'Monthly', 'Annually', 'Custom']
 
+// 4 transaction type tabs
+const TX_TYPES = [
+  { key: 'expense', label: 'Exp.',    icon: '',   colorClass: 'expense' },
+  { key: 'income',  label: 'Income',  icon: '',   colorClass: 'income'  },
+  { key: 'savings', label: 'Sav.',    icon: '💰', colorClass: 'savings' },
+  { key: 'loans',   label: 'Loans',   icon: '🏦', colorClass: 'loans'   },
+]
+
 const COLORS = [
   '#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#ff922b',
   '#cc5de8','#20c997','#f06595','#74c0fc','#a9e34b',
@@ -78,7 +86,6 @@ function squarify(items, x, y, w, h) {
   while (remaining.length) {
     const horiz   = cw >= ch
     const lineLen = horiz ? cw : ch
-    const lineW   = horiz ? ch : cw
     let batch = [], batchSum = 0, bestRatio = Infinity
 
     for (let i = 0; i < remaining.length; i++) {
@@ -89,9 +96,9 @@ function squarify(items, x, y, w, h) {
       const side     = area / lineLen
       let worst = 0
       for (const b of newBatch) {
-        const bArea  = (b.value / total) * (cw * ch)
-        const bSide  = bArea / side
-        const ratio  = Math.max(side / bSide, bSide / side)
+        const bArea = (b.value / total) * (cw * ch)
+        const bSide = bArea / side
+        const ratio = Math.max(side / bSide, bSide / side)
         worst = Math.max(worst, ratio)
       }
       if (worst > bestRatio) break
@@ -106,7 +113,7 @@ function squarify(items, x, y, w, h) {
       const bLen  = bArea / side
       results.push({
         ...b,
-        x: horiz ? cx         : cx + offset,
+        x: horiz ? cx          : cx + offset,
         y: horiz ? cy + offset : cy,
         w: horiz ? side        : bLen,
         h: horiz ? bLen        : side,
@@ -144,9 +151,9 @@ function Treemap({ data, colors, fmt, fmtC, onSelect }) {
   return (
     <div ref={containerRef} className="treemap-container">
       {rects.map((r, i) => {
-        const pct  = total > 0 ? Math.round((r.amount / total) * 100) : 0
-        const small = r.w < 60 || r.h < 40
-        const tinyW = r.w < 50, tinyH = r.h < 32
+        const pct     = total > 0 ? Math.round((r.amount / total) * 100) : 0
+        const small   = r.w < 60 || r.h < 40
+        const tinyW   = r.w < 50, tinyH = r.h < 32
         const fontSize = r.w < 80 ? 9 : r.w < 120 ? 10 : 11
         return (
           <button
@@ -158,7 +165,7 @@ function Treemap({ data, colors, fmt, fmtC, onSelect }) {
             {!tinyW && !tinyH && (
               <div className="treemap-label">
                 {!small && <span className="treemap-name" style={{ fontSize }}>{r.name}</span>}
-                <span className="treemap-pct" style={{ fontSize }}>{pct}%</span>
+                <span className="treemap-pct"  style={{ fontSize }}>{pct}%</span>
                 {!small && <span className="treemap-amt" style={{ fontSize: fontSize - 1 }}>{fmtC(r.amount)}</span>}
               </div>
             )}
@@ -169,21 +176,22 @@ function Treemap({ data, colors, fmt, fmtC, onSelect }) {
   )
 }
 
+// ── Main Stats component ──────────────────────────────────────
 export default function Stats() {
   const {
     user, householdId, categories, reloadTrigger, currency,
     secEnabled, secCurrency, secRate
   } = useApp()
-  const [period, setPeriod]             = useState('Monthly')
-  const [anchor, setAnchor]             = useState(new Date())
-  const [customStart, setCustomStart]   = useState(toFirestoreDate(startOfMonth(new Date())))
-  const [customEnd, setCustomEnd]       = useState(toFirestoreDate(endOfMonth(new Date())))
-  const [txType, setTxType]             = useState('expense')
+  const [period, setPeriod]           = useState('Monthly')
+  const [anchor, setAnchor]           = useState(new Date())
+  const [customStart, setCustomStart] = useState(toFirestoreDate(startOfMonth(new Date())))
+  const [customEnd, setCustomEnd]     = useState(toFirestoreDate(endOfMonth(new Date())))
+  const [txType, setTxType]           = useState('expense')
   const [transactions, setTransactions] = useState([])
-  const [loading, setLoading]           = useState(true)
-  const [drillCat, setDrillCat]         = useState(null)
-  const [drillSub, setDrillSub]         = useState(null)
-  const [editTx, setEditTx]             = useState(null)
+  const [loading, setLoading]         = useState(true)
+  const [drillCat, setDrillCat]       = useState(null)
+  const [drillSub, setDrillSub]       = useState(null)
+  const [editTx, setEditTx]           = useState(null)
 
   useEffect(() => { load() }, [period, anchor, customStart, customEnd, householdId, reloadTrigger])
 
@@ -197,7 +205,10 @@ export default function Stats() {
       start: toFirestoreDate(startOfYear(anchor)),
       end:   toFirestoreDate(endOfYear(anchor))
     }
-    return { start: toFirestoreDate(startOfMonth(anchor)), end: toFirestoreDate(endOfMonth(anchor)) }
+    return {
+      start: toFirestoreDate(startOfMonth(anchor)),
+      end:   toFirestoreDate(endOfMonth(anchor))
+    }
   }
 
   const load = async () => {
@@ -213,9 +224,11 @@ export default function Stats() {
   const fmtC = n => fmtCurrencyCompact(n, currency)
   const sec  = n => fmtSec(n, secEnabled, secRate, secCurrency)
 
-  const breakdown    = groupByCategory(transactions, txType)
-  const incomeTotal  = transactions.filter(t => t.type === 'income').reduce((a,t)  => a+t.amount, 0)
-  const expenseTotal = transactions.filter(t => t.type === 'expense').reduce((a,t) => a+t.amount, 0)
+  // Total per type — used in tabs
+  const totalByType = (type) =>
+    transactions.filter(t => t.type === type).reduce((a, t) => a + t.amount, 0)
+
+  const breakdown = groupByCategory(transactions, txType)
 
   const catTxs = drillCat
     ? transactions.filter(t => t.type === txType && t.category === drillCat)
@@ -228,19 +241,19 @@ export default function Stats() {
       const k = t.subcategory?.trim() || '(no subcategory)'
       map[k] = (map[k] || 0) + t.amount
     })
-    const sub = Object.values(map).reduce((a,b) => a+b, 0)
-    return Object.entries(map).sort((a,b) => b[1]-a[1])
-      .map(([name, amount]) => ({ name, amount, pct: sub ? Math.round((amount/sub)*100) : 0 }))
+    const sub = Object.values(map).reduce((a, b) => a + b, 0)
+    return Object.entries(map).sort((a, b) => b[1] - a[1])
+      .map(([name, amount]) => ({ name, amount, pct: sub ? Math.round((amount / sub) * 100) : 0 }))
   })()
 
   const subTxs = drillSub
     ? (drillSub === '__all__'
         ? catTxs
-        : catTxs.filter(t => (t.subcategory?.trim()||'(no subcategory)') === drillSub))
+        : catTxs.filter(t => (t.subcategory?.trim() || '(no subcategory)') === drillSub))
     : []
 
   const periodLabel = () => {
-    if (period === 'Weekly')   return `Week of ${format(startOfWeek(anchor,{weekStartsOn:1}),'MMM d')}`
+    if (period === 'Weekly')   return `Week of ${format(startOfWeek(anchor, { weekStartsOn: 1 }), 'MMM d')}`
     if (period === 'Annually') return format(anchor, 'yyyy')
     if (period === 'Monthly')  return format(anchor, 'MMMM yyyy')
     return `${customStart} → ${customEnd}`
@@ -248,13 +261,15 @@ export default function Stats() {
 
   return (
     <div className="stats-screen">
+
       {/* Period tabs */}
       <div className="stats-header">
         <div className="stats-period-tabs">
           {PERIOD_OPTIONS.map(p => (
             <button key={p}
               className={`stats-period-tab ${period === p ? 'active' : ''}`}
-              onClick={() => setPeriod(p)}>{p}</button>
+              onClick={() => setPeriod(p)}
+            >{p}</button>
           ))}
         </div>
         <div className="stats-nav-row">
@@ -262,7 +277,7 @@ export default function Stats() {
             <div className="custom-range">
               <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} />
               <span>→</span>
-              <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} />
+              <input type="date" value={customEnd}   onChange={e => setCustomEnd(e.target.value)} />
             </div>
           ) : (
             <PeriodNav period={period} anchor={anchor} onChange={setAnchor} />
@@ -270,35 +285,33 @@ export default function Stats() {
         </div>
       </div>
 
-      {/* Income / Expense tabs with totals + secondary */}
+      {/* 4-type tabs: Exp. | Income | Sav. | Loans */}
       <div className="stats-type-tabs">
-        <button
-          className={`stats-type-tab ${txType === 'income' ? 'active' : ''}`}
-          onClick={() => setTxType('income')}
-        >
-          <span className="stt-label">Income</span>
-          {txType === 'income' && (
-            <span className="stt-totals">
-              <span className="stt-total">{fmt(incomeTotal)}</span>
-              {sec(incomeTotal) && <span className="stt-total-sec">{sec(incomeTotal)}</span>}
-            </span>
-          )}
-        </button>
-        <button
-          className={`stats-type-tab ${txType === 'expense' ? 'active expense' : ''}`}
-          onClick={() => setTxType('expense')}
-        >
-          <span className="stt-label">Exp.</span>
-          {txType === 'expense' && (
-            <span className="stt-totals">
-              <span className="stt-total">{fmt(expenseTotal)}</span>
-              {sec(expenseTotal) && <span className="stt-total-sec">{sec(expenseTotal)}</span>}
-            </span>
-          )}
-        </button>
+        {TX_TYPES.map(({ key, label, icon, colorClass }) => {
+          const total = totalByType(key)
+          const active = txType === key
+          return (
+            <button
+              key={key}
+              className={`stats-type-tab ${active ? `active ${colorClass}` : ''}`}
+              onClick={() => { setTxType(key); setDrillCat(null); setDrillSub(null) }}
+            >
+              <span className="stt-label">
+                {icon && <span className="stt-icon">{icon} </span>}
+                {label}
+              </span>
+              {active && (
+                <span className="stt-totals">
+                  <span className="stt-total">{fmtC(total)}</span>
+                  {sec(total) && <span className="stt-total-sec">{sec(total)}</span>}
+                </span>
+              )}
+            </button>
+          )
+        })}
       </div>
 
-      {/* Treemap — fixed height, always visible */}
+      {/* Treemap — fixed height block */}
       <div className="treemap-wrap">
         {loading ? (
           <div className="treemap-loading"><span className="spinner" /></div>
@@ -317,7 +330,7 @@ export default function Stats() {
         )}
       </div>
 
-      {/* Category list — scrollable, shows secondary currency */}
+      {/* Category list */}
       <div className="stats-scroll">
         {!loading && breakdown.length > 0 && (
           <div className="stats-cat-list">
@@ -337,7 +350,6 @@ export default function Stats() {
                     {icon && <span className="stats-cat-icon">{icon}</span>}
                     <span className="stats-cat-text">{cat.name}</span>
                   </div>
-                  {/* Amount column: primary + secondary stacked */}
                   <div className="stats-cat-amounts">
                     <div className="stats-cat-amount">{fmt(cat.amount)}</div>
                     {sec(cat.amount) && <div className="stats-cat-amount-sec">{sec(cat.amount)}</div>}
@@ -349,7 +361,7 @@ export default function Stats() {
         )}
       </div>
 
-      {/* Drill level 1 */}
+      {/* Drill level 1 — subcategories */}
       {drillCat && !drillSub && (
         <>
           <div className="sheet-overlay" onClick={() => setDrillCat(null)} />
@@ -362,11 +374,11 @@ export default function Stats() {
             </div>
             <div className="sheet-body">
               <div className="drill-total">
-                {fmt(catTxs.reduce((a,t)=>a+t.amount,0))}
-                {sec(catTxs.reduce((a,t)=>a+t.amount,0)) && (
-                  <span className="drill-total-sec"> · {sec(catTxs.reduce((a,t)=>a+t.amount,0))}</span>
+                {fmt(catTxs.reduce((a, t) => a + t.amount, 0))}
+                {sec(catTxs.reduce((a, t) => a + t.amount, 0)) && (
+                  <span className="drill-total-sec"> · {sec(catTxs.reduce((a, t) => a + t.amount, 0))}</span>
                 )}
-                {' '} · {catTxs.length} transactions
+                {' '}· {catTxs.length} transactions
               </div>
               <button className="drill-all-btn" onClick={() => setDrillSub('__all__')}>
                 <span>All transactions</span>
@@ -386,7 +398,7 @@ export default function Stats() {
                         </div>
                       </div>
                       <div className="drill-sub-right">
-                        <div className="pct-badge" style={{ background: COLORS[i%COLORS.length]+'22', color: COLORS[i%COLORS.length] }}>
+                        <div className="pct-badge" style={{ background: COLORS[i % COLORS.length] + '22', color: COLORS[i % COLORS.length] }}>
                           {sub.pct}%
                         </div>
                         <span className="drill-sub-arrow">›</span>
@@ -400,7 +412,7 @@ export default function Stats() {
         </>
       )}
 
-      {/* Drill level 2 */}
+      {/* Drill level 2 — transactions */}
       {drillCat && drillSub && (
         <>
           <div className="sheet-overlay" onClick={() => setDrillSub(null)} />
@@ -413,11 +425,11 @@ export default function Stats() {
             </div>
             <div className="sheet-body">
               <div className="drill-total">
-                {fmt(subTxs.reduce((a,t)=>a+t.amount,0))}
-                {sec(subTxs.reduce((a,t)=>a+t.amount,0)) && (
-                  <span className="drill-total-sec"> · {sec(subTxs.reduce((a,t)=>a+t.amount,0))}</span>
+                {fmt(subTxs.reduce((a, t) => a + t.amount, 0))}
+                {sec(subTxs.reduce((a, t) => a + t.amount, 0)) && (
+                  <span className="drill-total-sec"> · {sec(subTxs.reduce((a, t) => a + t.amount, 0))}</span>
                 )}
-                {' '} · {subTxs.length} transactions
+                {' '}· {subTxs.length} transactions
               </div>
               {subTxs.map(tx => (
                 <TransactionItem key={tx.id} tx={tx} categories={categories}
@@ -429,7 +441,8 @@ export default function Stats() {
       )}
 
       {editTx && (
-        <AddTransaction tx={editTx} onClose={() => setEditTx(null)}
+        <AddTransaction tx={editTx}
+          onClose={() => setEditTx(null)}
           onSaved={() => { setEditTx(null); load() }} />
       )}
     </div>

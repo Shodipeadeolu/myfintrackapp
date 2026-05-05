@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import { getTransactions } from '../firebase/service'
 import { getBudgets, addBudget, updateBudget, deleteBudget } from '../firebase/budgets'
-import { fmtCurrency, toFirestoreDate } from '../utils/helpers'
+import { fmtCurrency, fmtCurrencyCompact, toFirestoreDate } from '../utils/helpers'
 import { fmtSec } from '../utils/secCurrency'
 import { startOfMonth, endOfMonth } from 'date-fns'
 import MonthNavigator from '../components/MonthNavigator'
+import TransactionItem from '../components/TransactionItem'
+import AddTransaction from '../components/AddTransaction'
 import CategoryPicker from '../components/CategoryPicker'
 import './Budgets.css'
 
@@ -22,12 +24,16 @@ export default function Budgets() {
     user, householdId, categories, canWrite, reloadTrigger, currency,
     secEnabled, secCurrency, secRate
   } = useApp()
-  const [month, setMonth]       = useState(new Date())
-  const [budgets, setBudgets]   = useState([])
-  const [spending, setSpending] = useState({})
-  const [loading, setLoading]   = useState(true)
-  const [showAdd, setShowAdd]   = useState(false)
+  const [month, setMonth]           = useState(new Date())
+  const [budgets, setBudgets]       = useState([])
+  const [allTxs, setAllTxs]         = useState([])
+  const [spending, setSpending]     = useState({})
+  const [loading, setLoading]       = useState(true)
+  const [showAdd, setShowAdd]       = useState(false)
   const [editBudget, setEditBudget] = useState(null)
+  // Detail view: show transactions for a budget category
+  const [detailBudget, setDetailBudget] = useState(null)
+  const [editTx, setEditTx]         = useState(null)
 
   useEffect(() => { load() }, [month, householdId, reloadTrigger])
 
@@ -42,14 +48,16 @@ export default function Budgets() {
         )
       ])
       setBudgets(buds)
+      setAllTxs(txs)
       const map = {}
       txs.filter(t => t.type === 'expense').forEach(t => { map[t.category] = (map[t.category]||0) + t.amount })
       setSpending(map)
     } finally { setLoading(false) }
   }
 
-  const fmt = n => fmtCurrency(n, currency)
-  const sec = n => fmtSec(n, secEnabled, secRate, secCurrency)
+  const fmt  = n => fmtCurrency(n, currency)
+  const fmtC = n => fmtCurrencyCompact(n, currency)
+  const sec  = n => fmtSec(n, secEnabled, secRate, secCurrency)
 
   const totalBudgeted = budgets.reduce((a, b) => a + b.amount, 0)
   const totalSpent    = budgets.reduce((a, b) => a + (spending[b.category]||0), 0)
@@ -65,6 +73,11 @@ export default function Budgets() {
 
   const handleSaved = () => { setShowAdd(false); setEditBudget(null); load() }
 
+  // Transactions for the detail view
+  const detailTxs = detailBudget
+    ? allTxs.filter(t => t.type === 'expense' && t.category === detailBudget.category)
+    : []
+
   return (
     <div className="screen">
       <div className="budgets-header">
@@ -78,7 +91,6 @@ export default function Budgets() {
           <div className="load-row"><span className="spinner" /></div>
         ) : (
           <>
-            {/* Purple summary card */}
             {budgets.length > 0 && (
               <div className="budget-summary-card">
                 <div className="bsc-title">Total Monthly Budget</div>
@@ -88,9 +100,7 @@ export default function Budgets() {
                   {fmt(totalSpent)} spent · {totalLeft >= 0 ? fmt(totalLeft) + ' remaining' : fmt(Math.abs(totalLeft)) + ' over'}
                 </div>
                 {sec(totalSpent) && (
-                  <div className="bsc-subtitle-sec">
-                    {sec(totalSpent)} spent · {sec(Math.abs(totalLeft))} {totalLeft >= 0 ? 'remaining' : 'over'}
-                  </div>
+                  <div className="bsc-subtitle-sec">{sec(totalSpent)} spent · {sec(Math.abs(totalLeft))} {totalLeft >= 0 ? 'remaining' : 'over'}</div>
                 )}
                 <div className="bsc-track"><div className="bsc-fill" style={{ width: `${overallPct}%` }} /></div>
                 <div className="bsc-footer">
@@ -125,47 +135,57 @@ export default function Budgets() {
                   const dotColor  = DOT_COLORS[idx % DOT_COLORS.length]
 
                   return (
-                    <button key={budget.id} className="budget-card" onClick={() => canWrite && setEditBudget(budget)}>
-                      <div className="bc-card-header">
-                        <div>
-                          <div className="bc-card-name">{budget.category}</div>
-                          <div className="bc-card-amounts">
-                            {fmt(spent)} of {fmt(budget.amount)}
+                    // Tap card → show transactions (detail view)
+                    // Tap ✎ edit icon → open edit sheet
+                    <div key={budget.id} className="budget-card" style={{ position: 'relative' }}>
+                      {/* Edit button top-right — only for canWrite */}
+                      {canWrite && (
+                        <button
+                          className="bc-edit-btn"
+                          onClick={e => { e.stopPropagation(); setEditBudget(budget) }}
+                          title="Edit budget"
+                        >✎</button>
+                      )}
+
+                      {/* Main card area → detail view */}
+                      <button
+                        className="bc-card-inner"
+                        onClick={() => setDetailBudget(budget)}
+                      >
+                        <div className="bc-card-header">
+                          <div>
+                            <div className="bc-card-name">{icon} {budget.category}</div>
+                            <div className="bc-card-amounts">{fmt(spent)} of {fmt(budget.amount)}</div>
+                            {sec(spent) && <div className="bc-card-amounts-sec">{sec(spent)} of {sec(budget.amount)}</div>}
                           </div>
-                          {/* Secondary currency under amounts */}
-                          {sec(spent) && (
-                            <div className="bc-card-amounts-sec">
-                              {sec(spent)} of {sec(budget.amount)}
-                            </div>
-                          )}
+                          <div className="bc-color-dot" style={{ background: dotColor }} />
                         </div>
-                        <div className="bc-color-dot" style={{ background: dotColor }} />
-                      </div>
 
-                      <div className="bc-track">
-                        <div className={`bc-fill ${status}`}
-                          style={{ width: `${pct}%`, background: dotColor, opacity: over ? 1 : 0.85 }} />
-                      </div>
-
-                      <div className="bc-card-footer">
-                        <div className="bc-footer-left">
-                          <span className={`bc-status ${status}`}>
-                            {over ? '↘' : '↗'} {over ? `Over by ${fmt(Math.abs(remaining))}` : `${fmt(remaining)} left`}
-                          </span>
-                          {sec(Math.abs(remaining)) && (
-                            <span className="bc-status-sec">{sec(Math.abs(remaining))}</span>
-                          )}
+                        <div className="bc-track">
+                          <div className={`bc-fill ${status}`}
+                            style={{ width: `${pct}%`, background: dotColor, opacity: over ? 1 : 0.85 }} />
                         </div>
-                        <span className="bc-card-pct">{Math.round(rawPct)}%</span>
-                      </div>
 
-                      {rawPct >= 80 && !over && (
-                        <div className="bc-warning-msg warn">⚠ Approaching budget limit</div>
-                      )}
-                      {over && (
-                        <div className="bc-warning-msg danger">⊘ Budget exceeded</div>
-                      )}
-                    </button>
+                        <div className="bc-card-footer">
+                          <div className="bc-footer-left">
+                            <span className={`bc-status ${status}`}>
+                              {over ? '↘' : '↗'} {over ? `Over by ${fmtC(Math.abs(remaining))}` : `${fmtC(remaining)} left`}
+                            </span>
+                            {sec(Math.abs(remaining)) && (
+                              <span className="bc-status-sec">{sec(Math.abs(remaining))}</span>
+                            )}
+                          </div>
+                          <span className="bc-card-pct">{Math.round(rawPct)}%</span>
+                        </div>
+
+                        {rawPct >= 80 && !over && (
+                          <div className="bc-warning-msg warn">⚠ Approaching budget limit</div>
+                        )}
+                        {over && (
+                          <div className="bc-warning-msg danger">⊘ Budget exceeded</div>
+                        )}
+                      </button>
+                    </div>
                   )
                 })}
               </div>
@@ -174,6 +194,61 @@ export default function Budgets() {
         )}
       </div>
 
+      {/* Budget detail sheet — shows transactions for that category */}
+      {detailBudget && (
+        <>
+          <div className="sheet-overlay" onClick={() => setDetailBudget(null)} />
+          <div className="sheet">
+            <div className="sheet-handle" />
+            <div className="sheet-header">
+              <button className="btn btn-ghost" onClick={() => setDetailBudget(null)}>✕</button>
+              <span className="sheet-title">{detailBudget.category}</span>
+              {canWrite && (
+                <button className="btn btn-ghost" onClick={() => { setDetailBudget(null); setEditBudget(detailBudget) }}>✎ Edit</button>
+              )}
+            </div>
+            <div className="sheet-body">
+              {/* Budget summary bar */}
+              <div className="detail-budget-bar">
+                <div className="detail-budget-nums">
+                  <span className="detail-spent">{fmt(spending[detailBudget.category]||0)} spent</span>
+                  <span className="detail-of"> of {fmt(detailBudget.amount)}</span>
+                </div>
+                {sec(spending[detailBudget.category]||0) && (
+                  <div className="detail-budget-sec">{sec(spending[detailBudget.category]||0)} spent</div>
+                )}
+                <div className="detail-budget-track">
+                  <div
+                    className="detail-budget-fill"
+                    style={{
+                      width: `${Math.min(((spending[detailBudget.category]||0)/detailBudget.amount)*100, 100)}%`,
+                      background: (spending[detailBudget.category]||0) > detailBudget.amount ? 'var(--red)' : 'var(--green)'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Transaction list */}
+              <div className="detail-tx-title">
+                Transactions ({detailTxs.length})
+              </div>
+              {detailTxs.length === 0 ? (
+                <div className="empty-state">
+                  <span className="icon">💸</span>
+                  <p>No transactions for this category this month.</p>
+                </div>
+              ) : (
+                detailTxs.map(tx => (
+                  <TransactionItem key={tx.id} tx={tx} categories={categories}
+                    onClick={t => { setDetailBudget(null); setEditTx(t) }} />
+                ))
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Edit budget sheet */}
       {(showAdd || editBudget) && (
         <BudgetSheet
           budget={editBudget}
@@ -183,6 +258,13 @@ export default function Budgets() {
           onSaved={handleSaved} onDeleted={handleSaved}
           user={user} householdId={householdId} currency={currency}
         />
+      )}
+
+      {/* Edit transaction from detail view */}
+      {editTx && (
+        <AddTransaction tx={editTx}
+          onClose={() => setEditTx(null)}
+          onSaved={() => { setEditTx(null); load() }} />
       )}
     </div>
   )
