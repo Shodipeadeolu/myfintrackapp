@@ -1,0 +1,44 @@
+.ln-balance-card {
+  background: linear-gradient(135deg, #4a80e8 0%, #2c5fc7 100%);
+  border-radius: var(--radius-lg); padding: 20px; color: #fff;
+  margin-bottom: 16px; position: relative; overflow: hidden;
+}
+.ln-balance-card::before {
+  content: ''; position: absolute; top: -30px; right: -30px;
+  width: 120px; height: 120px; border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+}
+.ln-balance-label   { font-size: 11px; font-weight: 600; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.08em; }
+.ln-balance-amount  { font-size: clamp(26px, 7vw, 36px); font-weight: 800; margin: 4px 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ln-balance-sec     { font-size: 13px; font-weight: 600; opacity: 0.7; margin-bottom: 4px; }
+.ln-balance-warning { font-size: 12px; font-weight: 600; background: rgba(239,68,68,0.25); color: #fca5a5; padding: 4px 10px; border-radius: 20px; display: inline-block; margin-bottom: 12px; }
+.ln-balance-clear   { font-size: 12px; font-weight: 600; background: rgba(0,196,140,0.2); color: #6ee7b7; padding: 4px 10px; border-radius: 20px; display: inline-block; margin-bottom: 12px; }
+
+.ln-balance-stats  { display: flex; align-items: center; background: rgba(255,255,255,0.15); border-radius: 10px; padding: 10px 14px; }
+.ln-stat           { flex: 1; }
+.ln-stat-label     { font-size: 10px; font-weight: 600; opacity: 0.75; text-transform: uppercase; }
+.ln-stat-value     { font-size: 14px; font-weight: 800; margin-top: 2px; }
+.ln-stat-value.borrow { color: #fff; }
+.ln-stat-value.repay  { color: rgba(255,255,255,0.8); }
+.ln-stat-divider   { width: 1px; height: 32px; background: rgba(255,255,255,0.25); margin: 0 14px; }
+
+.ln-add-form {
+  background: var(--bg-elevated); border-radius: var(--radius-md);
+  padding: 16px; margin-bottom: 16px; border: 1px solid var(--border);
+}
+.ln-type-toggle {
+  display: flex; gap: 6px; margin-bottom: 14px;
+  background: var(--bg-card); border-radius: var(--radius-sm); padding: 4px;
+}
+.ln-type-btn {
+  flex: 1; padding: 9px; border-radius: 8px;
+  font-size: 13px; font-weight: 700; color: var(--text-secondary);
+  transition: all var(--transition);
+}
+.ln-type-btn.active-borrow { background: rgba(74,128,232,0.15); color: #4a80e8; }
+.ln-type-btn.active-repay  { background: rgba(0,196,140,0.15);  color: var(--green); }
+
+.ln-history-title {
+  font-size: 14px; font-weight: 700; color: var(--text-primary);
+  margin-bottom: 12px; padding-top: 4px; border-top: 1px solid var(--border);
+}

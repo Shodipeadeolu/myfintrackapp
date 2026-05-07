@@ -1,0 +1,49 @@
+.sheet-tall { max-height: 96vh; }
+
+/* Balance card */
+.sv-balance-card {
+  background: linear-gradient(135deg, #f5a623 0%, #e08c10 100%);
+  border-radius: var(--radius-lg); padding: 20px; color: #fff;
+  margin-bottom: 16px; position: relative; overflow: hidden;
+}
+.sv-balance-card::before {
+  content: ''; position: absolute; top: -30px; right: -30px;
+  width: 120px; height: 120px; border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+}
+.sv-balance-label  { font-size: 11px; font-weight: 600; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.08em; }
+.sv-balance-amount { font-size: clamp(26px, 7vw, 36px); font-weight: 800; margin: 4px 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sv-balance-sec    { font-size: 13px; font-weight: 600; opacity: 0.7; margin-bottom: 14px; }
+
+.sv-balance-stats  { display: flex; align-items: center; background: rgba(255,255,255,0.15); border-radius: 10px; padding: 10px 14px; }
+.sv-stat           { flex: 1; }
+.sv-stat-label     { font-size: 10px; font-weight: 600; opacity: 0.75; text-transform: uppercase; }
+.sv-stat-value     { font-size: 14px; font-weight: 800; margin-top: 2px; }
+.sv-stat-value.deposit  { color: #fff; }
+.sv-stat-value.withdraw { color: rgba(255,255,255,0.8); }
+.sv-stat-divider   { width: 1px; height: 32px; background: rgba(255,255,255,0.25); margin: 0 14px; }
+
+/* Add form */
+.sv-add-form {
+  background: var(--bg-elevated); border-radius: var(--radius-md);
+  padding: 16px; margin-bottom: 16px;
+  border: 1px solid var(--border);
+}
+.sv-type-toggle {
+  display: flex; gap: 6px; margin-bottom: 14px;
+  background: var(--bg-card); border-radius: var(--radius-sm); padding: 4px;
+}
+.sv-type-btn {
+  flex: 1; padding: 9px; border-radius: 8px;
+  font-size: 13px; font-weight: 700; color: var(--text-secondary);
+  transition: all var(--transition);
+}
+.sv-type-btn.active-deposit  { background: rgba(0,196,140,0.15); color: var(--green); }
+.sv-type-btn.active-withdraw { background: rgba(232,66,26,0.15);  color: var(--accent); }
+
+/* History */
+.sv-history-title {
+  font-size: 14px; font-weight: 700; color: var(--text-primary);
+  margin-bottom: 12px; padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
