@@ -228,6 +228,9 @@ export default function Stats() {
   const totalByType = (type) =>
     transactions.filter(t => t.type === type).reduce((a, t) => a + t.amount, 0)
 
+  // Treemap always shows expense breakdown only (savings/loans excluded)
+  const treemapData = groupByCategory(transactions, 'expense')
+  // Category list uses selected txType
   const breakdown = groupByCategory(transactions, txType)
 
   const catTxs = drillCat
@@ -324,7 +327,8 @@ export default function Stats() {
           </div>
         ) : (
           <Treemap
-            data={breakdown} colors={COLORS} fmt={fmt} fmtC={fmtC}
+            data={txType === 'expense' ? treemapData : breakdown}
+            colors={COLORS} fmt={fmt} fmtC={fmtC}
             onSelect={d => { setDrillCat(d.name); setDrillSub(null) }}
           />
         )}
