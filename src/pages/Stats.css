@@ -4,7 +4,6 @@
   height: 100%; overflow: hidden;
 }
 
-/* Period tabs */
 .stats-header { padding: 12px 16px 0; flex-shrink: 0; }
 .stats-period-tabs {
   display: flex; background: var(--bg-elevated);
@@ -23,7 +22,6 @@
   width: 32px; height: 32px; border-radius: 50%;
   background: var(--bg-elevated); color: var(--text-secondary); font-size: 20px;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  transition: all var(--transition);
 }
 .period-nav-btn:active   { opacity: 0.6; transform: scale(0.9); }
 .period-nav-btn:disabled { opacity: 0.25; pointer-events: none; }
@@ -38,41 +36,33 @@
 
 /* 4-type tabs */
 .stats-type-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--border);
-  padding: 0 12px;
-  flex-shrink: 0;
+  display: flex; border-bottom: 1px solid var(--border);
+  padding: 0 12px; flex-shrink: 0;
 }
 .stats-type-tab {
-  flex: 1; padding: 7px 4px;
+  flex: 1; padding: 6px 2px;
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   color: var(--text-muted);
   border-bottom: 2px solid transparent; margin-bottom: -1px;
-  transition: all var(--transition);
-  min-width: 0;
+  transition: all var(--transition); min-width: 0;
 }
 .stats-type-tab.active         { color: var(--text-primary); border-bottom-color: var(--accent); }
 .stats-type-tab.active.income  { border-bottom-color: var(--green); }
 .stats-type-tab.active.savings { border-bottom-color: #f5a623; }
 .stats-type-tab.active.loans   { border-bottom-color: #4a80e8; }
 
-.stt-label {
-  font-size: 11px; font-weight: 700;
-  display: flex; align-items: center; gap: 2px;
-  white-space: nowrap;
-}
-.stt-icon { font-size: 12px; }
+.stt-label { font-size: 11px; font-weight: 700; white-space: nowrap; }
 .stt-totals {
-  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  display: flex; flex-direction: column; align-items: center; gap: 0;
   min-width: 0; max-width: 100%;
 }
 .stt-total {
-  font-size: clamp(11px, 3vw, 14px); font-weight: 800;
+  font-size: clamp(10px, 2.8vw, 13px); font-weight: 800;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
 }
-.stt-total-sec {
-  font-size: 9px; font-weight: 600; color: var(--text-muted); white-space: nowrap;
-}
+.stt-total-sec    { font-size: 9px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.stt-balance-hint { font-size: 8px; color: var(--text-muted); font-weight: 500; }
+
 .stats-type-tab.active         .stt-total { color: var(--accent); }
 .stats-type-tab.active.income  .stt-total { color: var(--green); }
 .stats-type-tab.active.savings .stt-total { color: #f5a623; }
@@ -80,9 +70,7 @@
 
 /* Treemap */
 .treemap-wrap {
-  flex-shrink: 0;
-  height: 220px;
-  padding: 8px 12px 4px;
+  flex-shrink: 0; height: 220px; padding: 8px 12px 4px;
 }
 .treemap-loading, .treemap-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -105,7 +93,7 @@
 .treemap-pct  { font-weight: 800; color: rgba(255,255,255,0.88); text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
 .treemap-amt  { font-weight: 600; color: rgba(255,255,255,0.72); text-shadow: 0 1px 2px rgba(0,0,0,0.35); }
 
-/* Category list scroll */
+/* Category list */
 .stats-scroll {
   flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
   padding-bottom: calc(var(--nav-h) + 20px);
@@ -120,27 +108,26 @@
 }
 .stats-cat-item:last-child { border-bottom: none; }
 .stats-cat-item:active { opacity: 0.6; }
-
 .stats-pct-badge {
   min-width: 46px; height: 26px; border-radius: 7px;
   display: flex; align-items: center; justify-content: center;
   font-size: 12px; font-weight: 800; color: #fff; flex-shrink: 0;
 }
-.stats-cat-name  { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
-.stats-cat-icon  { font-size: 15px; flex-shrink: 0; }
-.stats-cat-text  { font-size: 14px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stats-cat-name    { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.stats-cat-icon    { font-size: 15px; flex-shrink: 0; }
+.stats-cat-text    { font-size: 14px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stats-cat-amounts { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; gap: 2px; }
 .stats-cat-amount  { font-size: 14px; font-weight: 700; color: var(--text-primary); white-space: nowrap; }
 .stats-cat-amount-sec { font-size: 11px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
 
-/* Drill sheets */
+/* Drill */
 .drill-total { font-size: 13px; color: var(--text-muted); font-weight: 600; margin-bottom: 16px; }
 .drill-total-sec { font-size: 12px; color: var(--text-muted); }
 .drill-all-btn {
   width: 100%; display: flex; align-items: center; justify-content: space-between;
   padding: 12px 16px; background: var(--bg-elevated);
   border-radius: var(--radius-md); font-size: 14px; font-weight: 600;
-  color: var(--text-primary); margin-bottom: 16px; transition: opacity var(--transition);
+  color: var(--text-primary); margin-bottom: 16px;
 }
 .drill-all-btn:active { opacity: 0.7; }
 .drill-all-count { background: var(--accent-light); color: var(--accent); font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }

@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext'
 import { getTransactions } from '../firebase/service'
 import { fmtCurrency, fmtCurrencyCompact, toFirestoreDate } from '../utils/helpers'
 import { fmtSec } from '../utils/secCurrency'
+import { calcCashBalance } from '../utils/balanceCalc'
 import { startOfMonth, endOfMonth } from 'date-fns'
 import MonthNavigator from '../components/MonthNavigator'
 import TransactionItem from '../components/TransactionItem'
@@ -18,7 +19,7 @@ function firstName(profile, user) {
 export default function Home({ onNavigate }) {
   const {
     user, profile, householdId, categories,
-    theme, toggleTheme, household, dataLoading,
+    theme, toggleTheme, dataLoading,
     reloadTrigger, currency,
     balanceRollover,
     secEnabled, secCurrency, secRate
@@ -51,21 +52,23 @@ export default function Home({ onNavigate }) {
           : Promise.resolve([])
       ])
       setTransactions(txs)
-      if (balanceRollover) {
-        const prev = prevTxs.reduce((a, t) => t.type === 'income' ? a + t.amount : a - t.amount, 0)
-        setPrevBalance(prev)
-      } else {
-        setPrevBalance(0)
-      }
+      setPrevBalance(balanceRollover ? calcCashBalance(prevTxs) : 0)
     } catch (e) { console.error('Home load error:', e) }
     finally { setLoading(false) }
   }
 
-  const income   = transactions.filter(t => t.type === 'income').reduce((a, t) => a + t.amount, 0)
-  const expenses = transactions.filter(t => t.type === 'expense').reduce((a, t) => a + t.amount, 0)
-  const balance  = prevBalance + income - expenses
-  const savings  = balance > 0 ? balance : 0
-  const recent   = transactions.slice(0, 5)
+  // Cash balance = income - expense + savings effects + loan effects
+  const monthCashEffect = calcCashBalance(transactions)
+  const balance  = prevBalance + monthCashEffect
+
+  // For stat cards — just expense and income for the month display
+  const income   = transactions.filter(t => t.type === 'income').reduce((a,t)  => a+t.amount, 0)
+  const expenses = transactions.filter(t => t.type === 'expense').reduce((a,t) => a+t.amount, 0)
+  const savings  = transactions.filter(t => t.type === 'savings' && t.subtype !== 'withdraw').reduce((a,t) => a+t.amount, 0)
+
+  const recent = [...transactions]
+    .sort((a, b) => (b.date||'').localeCompare(a.date||''))
+    .slice(0, 5)
 
   const fmt  = n => fmtCurrency(n, currency)
   const fmtC = n => fmtCurrencyCompact(n, currency)
@@ -111,7 +114,7 @@ export default function Home({ onNavigate }) {
           {[
             { label: 'Income',   val: income,   cls: 'income-card',  valCls: 'income-val',  icon: '↗', iconCls: 'income-icon'  },
             { label: 'Expenses', val: expenses, cls: 'expense-card', valCls: 'expense-val', icon: '↘', iconCls: 'expense-icon' },
-            { label: 'Savings',  val: savings,  cls: 'savings-card', valCls: 'savings-val', icon: '🐖',iconCls: 'savings-icon' },
+            { label: 'Saved',    val: savings,  cls: 'savings-card', valCls: 'savings-val', icon: '💰',iconCls: 'savings-icon' },
           ].map(({ label, val, cls, valCls, icon, iconCls }) => (
             <div key={label} className={`stat-card ${cls}`}>
               <div className={`stat-card-icon ${iconCls}`}>{icon}</div>
