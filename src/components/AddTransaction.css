@@ -1,44 +1,34 @@
-/* Type toggle */
+/* 4-type toggle — 2x2 grid on narrow, row on wide */
 .type-toggle {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
   background: var(--bg-elevated);
   border-radius: var(--radius-sm);
-  padding: 4px;
-  gap: 4px;
+  padding: 6px;
   margin-bottom: 16px;
 }
 
 .type-btn {
-  flex: 1;
-  padding: 10px;
+  padding: 9px 8px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text-secondary);
   transition: all var(--transition);
+  white-space: nowrap;
 }
 
-.type-btn.active-expense {
-  background: rgba(232,66,26,0.15);
-  color: var(--accent);
-}
-
-.type-btn.active-income {
-  background: rgba(0,196,140,0.15);
-  color: var(--green);
-}
+.type-btn.active-expense  { background: rgba(232,66,26,0.15);  color: var(--accent); }
+.type-btn.active-income   { background: rgba(0,196,140,0.15);  color: var(--green); }
+.type-btn.active-savings  { background: rgba(245,166,35,0.15); color: #f5a623; }
+.type-btn.active-loans    { background: rgba(74,128,232,0.15); color: #4a80e8; }
 
 /* Duplicate button */
 .duplicate-btn {
   margin-top: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-size: 14px !important;
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px; font-size: 14px !important;
   color: var(--text-secondary) !important;
 }
-
-.duplicate-btn span:first-child {
-  font-size: 17px;
-}
+.duplicate-btn span:first-child { font-size: 17px; }

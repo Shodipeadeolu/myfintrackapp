@@ -15,6 +15,14 @@ const CURRENCY_SYMBOLS = {
 }
 const getSym = (c) => CURRENCY_SYMBOLS[c] || c
 
+// All 4 transaction types
+const TX_TYPES = [
+  { key: 'expense', label: '↑ Expense',  color: 'active-expense'  },
+  { key: 'income',  label: '↓ Income',   color: 'active-income'   },
+  { key: 'savings', label: '💰 Savings', color: 'active-savings'  },
+  { key: 'loans',   label: '🏦 Loans',   color: 'active-loans'    },
+]
+
 export default function AddTransaction({ tx, onClose, onSaved }) {
   const { user, householdId, categories, canWrite, currency } = useApp()
   const editing = !!tx
@@ -33,11 +41,17 @@ export default function AddTransaction({ tx, onClose, onSaved }) {
   const [err, setErr]                 = useState('')
   const [toast, setToast]             = useState(null)
 
-  const filteredCats = categories.filter(c => c.type === type)
-  const selectedCat  = categories.find(c => c.name === category)
-  const subcats      = selectedCat?.subcategories || []
+  // Filter categories by type — savings/loans use their own type, 
+  // but fall back to showing all if no categories exist for that type
+  const filteredCats = categories.filter(c =>
+    c.type === type ||
+    // savings and loans may share categories with expense/income
+    (['savings','loans'].includes(type) && (c.type === 'expense' || c.type === 'income' || c.type === type))
+  )
+  const selectedCat = categories.find(c => c.name === category)
+  const subcats     = selectedCat?.subcategories || []
 
-  // Only clear category when user actively toggles type, not on mount
+  // Only clear category when user actively switches type
   const prevType = useRef(type)
   useEffect(() => {
     if (prevType.current !== type) {
@@ -72,19 +86,16 @@ export default function AddTransaction({ tx, onClose, onSaved }) {
     }
   }
 
-  // Duplicate: clone this transaction with today's date, then save
   const handleDuplicate = async () => {
     if (!amount || isNaN(parseFloat(amount))) return setErr('Enter a valid amount')
     if (!category) return setErr('Pick a category')
     setErr(''); setDuplicating(true)
     try {
-      const data = {
+      await addTransaction(user.uid, householdId, {
         type, amount: parseFloat(amount), category, subcategory,
-        date: toFirestoreDate(new Date()), // always today
-        note: note.trim()
-      }
-      await addTransaction(user.uid, householdId, data)
-      setToast({ msg: 'Duplicated with today\'s date!', type: 'success' })
+        date: toFirestoreDate(new Date()), note: note.trim()
+      })
+      setToast({ msg: "Duplicated with today's date!", type: 'success' })
       setTimeout(() => onSaved(), 800)
     } catch {
       setErr('Duplicate failed.')
@@ -122,14 +133,15 @@ export default function AddTransaction({ tx, onClose, onSaved }) {
         </div>
 
         <div className="sheet-body">
+          {/* 4-type toggle */}
           <div className="type-toggle">
-            {['expense', 'income'].map(t => (
+            {TX_TYPES.map(({ key, label, color }) => (
               <button
-                key={t}
-                className={`type-btn ${type === t ? 'active-' + t : ''}`}
-                onClick={() => setType(t)}
+                key={key}
+                className={`type-btn ${type === key ? color : ''}`}
+                onClick={() => setType(key)}
               >
-                {t === 'expense' ? '↑ Expense' : '↓ Income'}
+                {label}
               </button>
             ))}
           </div>
@@ -184,18 +196,12 @@ export default function AddTransaction({ tx, onClose, onSaved }) {
               >
                 {saving ? <span className="spinner" /> : editing ? 'Save Changes' : 'Add Transaction'}
               </button>
-
-              {/* Duplicate button — only shown when editing */}
               {editing && (
                 <button
                   className="btn btn-secondary btn-full duplicate-btn"
-                  onClick={handleDuplicate}
-                  disabled={saving || duplicating}
+                  onClick={handleDuplicate} disabled={saving || duplicating}
                 >
-                  {duplicating
-                    ? <span className="spinner" />
-                    : <><span>⧉</span> Duplicate with Today's Date</>
-                  }
+                  {duplicating ? <span className="spinner" /> : <><span>⧉</span> Duplicate with Today's Date</>}
                 </button>
               )}
             </>
