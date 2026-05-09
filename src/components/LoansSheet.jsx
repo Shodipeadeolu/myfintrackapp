@@ -125,8 +125,13 @@ export default function LoansSheet({ onClose, onSaved }) {
               <div className="amount-field">
                 <span className="currency-sym">{getSym(currency)}</span>
                 <input
-                  type="number" inputMode="decimal" placeholder="0.00"
-                  value={amount} onChange={e => setAmount(e.target.value)}
+                  type="text" inputMode="decimal" placeholder="0.00"
+                  value={amount ? parseFloat(amount.replace(/,/g,'')).toLocaleString('en-US', {maximumFractionDigits:2}) : ''}
+                  onChange={e => {
+                    const raw = e.target.value.replace(/,/g, '').replace(/[^0-9.]/g, '')
+                    const parts = raw.split('.')
+                    setAmount(parts.length > 1 ? parts[0] + '.' + parts[1] : parts[0])
+                  }}
                   className="amount-input" autoFocus
                 />
               </div>
