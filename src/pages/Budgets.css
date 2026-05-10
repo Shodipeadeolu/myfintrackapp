@@ -113,3 +113,113 @@
 .detail-budget-fill  { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
 
 .detail-tx-title { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 12px; padding-top: 4px; border-top: 1px solid var(--border); }
+
+/* ── Unbudgeted Spending Card ─────────────────────────────── */
+.unbudgeted-card {
+  margin: 16px 20px 8px;
+  background: var(--bg-card);
+  border: 1.5px solid rgba(245,166,35,0.35);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.unbudgeted-header {
+  width: 100%;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px;
+  text-align: left;
+  gap: 12px;
+  transition: background var(--transition);
+}
+.unbudgeted-header:active { background: var(--bg-elevated); }
+
+.unbudgeted-left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+
+.unbudgeted-icon {
+  font-size: 18px;
+  width: 36px; height: 36px;
+  background: rgba(245,166,35,0.12);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+.unbudgeted-title {
+  font-size: 14px; font-weight: 700; color: var(--text-primary);
+}
+.unbudgeted-subtitle {
+  font-size: 11px; color: var(--text-muted); margin-top: 2px;
+}
+
+.unbudgeted-right {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0;
+}
+.unbudgeted-total {
+  font-size: 15px; font-weight: 800; color: var(--amber);
+}
+.unbudgeted-sec {
+  font-size: 11px; color: var(--text-muted);
+}
+.unbudgeted-chevron {
+  font-size: 10px; color: var(--text-muted); margin-top: 2px;
+}
+
+/* Expanded body */
+.unbudgeted-body {
+  border-top: 1px solid var(--border);
+  padding: 12px 16px 16px;
+}
+
+/* Category rows */
+.unbudgeted-cats { margin-bottom: 14px; }
+
+.unbudgeted-cat-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+.unbudgeted-cat-row:last-child { border-bottom: none; }
+
+.unbudgeted-cat-info {
+  display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;
+}
+.unbudgeted-cat-icon { font-size: 18px; flex-shrink: 0; }
+.unbudgeted-cat-name {
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.unbudgeted-cat-count { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
+.unbudgeted-cat-right { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; flex-shrink: 0; }
+.unbudgeted-cat-amt  { font-size: 14px; font-weight: 700; color: var(--text-primary); white-space: nowrap; }
+.unbudgeted-cat-sec  { font-size: 11px; color: var(--text-muted); }
+.unbudgeted-cat-pct  { font-size: 11px; color: var(--text-muted); }
+
+/* Transaction rows */
+.unbudgeted-txs-title {
+  font-size: 12px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: 8px; margin-top: 4px;
+}
+
+.unbudgeted-tx-row {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 0; border-bottom: 1px solid var(--border);
+  text-align: left; gap: 12px; transition: opacity var(--transition);
+}
+.unbudgeted-tx-row:last-of-type { border-bottom: none; }
+.unbudgeted-tx-row:active { opacity: 0.6; }
+
+.unbudgeted-tx-info { flex: 1; min-width: 0; }
+.unbudgeted-tx-name {
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.unbudgeted-tx-meta { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.unbudgeted-tx-amt  { font-size: 13px; font-weight: 700; color: var(--text-primary); white-space: nowrap; flex-shrink: 0; }
+
+.unbudgeted-more {
+  font-size: 12px; color: var(--text-muted); text-align: center;
+  padding-top: 10px; font-weight: 500;
+}
