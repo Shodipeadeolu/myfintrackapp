@@ -8,7 +8,6 @@ import { startOfMonth, endOfMonth } from 'date-fns'
 import MonthNavigator from '../components/MonthNavigator'
 import TransactionItem from '../components/TransactionItem'
 import AddTransaction from '../components/AddTransaction'
-import AddTransaction from '../components/AddTransaction'
 import CategoryPicker from '../components/CategoryPicker'
 import './Budgets.css'
 
@@ -21,10 +20,7 @@ const CURRENCY_SYMBOLS = {
 const DOT_COLORS = ['#7c3aed','#e8421a','#00c48c','#4a80e8','#f5a623','#ef4444','#06b6d4','#ec4899']
 
 export default function Budgets() {
-  const {
-    user, householdId, categories, canWrite, reloadTrigger, currency,
-    secEnabled, secCurrency, secRate
-  } = useApp()
+  const { user, householdId, categories, canWrite, reloadTrigger, currency, secEnabled, secCurrency, secRate } = useApp()
   const [month, setMonth]           = useState(new Date())
   const [budgets, setBudgets]       = useState([])
   const [allTxs, setAllTxs]         = useState([])
@@ -32,7 +28,6 @@ export default function Budgets() {
   const [loading, setLoading]       = useState(true)
   const [showAdd, setShowAdd]       = useState(false)
   const [editBudget, setEditBudget] = useState(null)
-  // Detail view: show transactions for a budget category
   const [detailBudget, setDetailBudget] = useState(null)
   const [editTx, setEditTx]         = useState(null)
 
@@ -74,10 +69,21 @@ export default function Budgets() {
 
   const handleSaved = () => { setShowAdd(false); setEditBudget(null); load() }
 
-  // Transactions for the detail view
   const detailTxs = detailBudget
     ? allTxs.filter(t => t.type === 'expense' && t.category === detailBudget.category)
     : []
+
+  // Unbudgeted spending
+  const budgetedCats   = new Set(budgets.map(b => b.category))
+  const unbudgetedTxs  = allTxs.filter(t => t.type === 'expense' && !budgetedCats.has(t.category))
+  const unbudgetedTotal = unbudgetedTxs.reduce((a, t) => a + t.amount, 0)
+  const unbudgetedByCat = {}
+  unbudgetedTxs.forEach(t => {
+    if (!unbudgetedByCat[t.category]) unbudgetedByCat[t.category] = { amount: 0, count: 0 }
+    unbudgetedByCat[t.category].amount += t.amount
+    unbudgetedByCat[t.category].count  += 1
+  })
+  const [unbudgetedExpanded, setUnbudgetedExpanded] = useState(false)
 
   return (
     <div className="screen">
@@ -92,6 +98,7 @@ export default function Budgets() {
           <div className="load-row"><span className="spinner" /></div>
         ) : (
           <>
+            {/* Purple summary card */}
             {budgets.length > 0 && (
               <div className="budget-summary-card">
                 <div className="bsc-title">Total Monthly Budget</div>
@@ -117,17 +124,7 @@ export default function Budgets() {
               </button>
             )}
 
-            {/* Unbudgeted spending — expenses with no budget */}
-            <UnbudgetedCard
-              allTxs={allTxs}
-              budgets={budgets}
-              categories={categories}
-              fmt={fmt}
-              sec={sec}
-              fmtC={fmtC}
-              onSelectTx={setEditTx}
-            />
-
+            {/* Budget grid */}
             {sorted.length === 0 ? (
               <div className="empty-state" style={{ marginTop: 40 }}>
                 <span className="icon">🎯</span>
@@ -147,23 +144,13 @@ export default function Budgets() {
                   const dotColor  = DOT_COLORS[idx % DOT_COLORS.length]
 
                   return (
-                    // Tap card → show transactions (detail view)
-                    // Tap ✎ edit icon → open edit sheet
-                    <div key={budget.id} className="budget-card" style={{ position: 'relative' }}>
-                      {/* Edit button top-right — only for canWrite */}
+                    <div key={budget.id} className="budget-card">
                       {canWrite && (
-                        <button
-                          className="bc-edit-btn"
+                        <button className="bc-edit-btn"
                           onClick={e => { e.stopPropagation(); setEditBudget(budget) }}
-                          title="Edit budget"
-                        >✎</button>
+                          title="Edit budget">✎</button>
                       )}
-
-                      {/* Main card area → detail view */}
-                      <button
-                        className="bc-card-inner"
-                        onClick={() => setDetailBudget(budget)}
-                      >
+                      <button className="bc-card-inner" onClick={() => setDetailBudget(budget)}>
                         <div className="bc-card-header">
                           <div>
                             <div className="bc-card-name">{icon} {budget.category}</div>
@@ -172,41 +159,99 @@ export default function Budgets() {
                           </div>
                           <div className="bc-color-dot" style={{ background: dotColor }} />
                         </div>
-
                         <div className="bc-track">
-                          <div className={`bc-fill ${status}`}
-                            style={{ width: `${pct}%`, background: dotColor, opacity: over ? 1 : 0.85 }} />
+                          <div className={`bc-fill ${status}`} style={{ width: `${pct}%`, background: dotColor, opacity: over?1:0.85 }} />
                         </div>
-
                         <div className="bc-card-footer">
                           <div className="bc-footer-left">
                             <span className={`bc-status ${status}`}>
                               {over ? '↘' : '↗'} {over ? `Over by ${fmtC(Math.abs(remaining))}` : `${fmtC(remaining)} left`}
                             </span>
-                            {sec(Math.abs(remaining)) && (
-                              <span className="bc-status-sec">{sec(Math.abs(remaining))}</span>
-                            )}
+                            {sec(Math.abs(remaining)) && <span className="bc-status-sec">{sec(Math.abs(remaining))}</span>}
                           </div>
                           <span className="bc-card-pct">{Math.round(rawPct)}%</span>
                         </div>
-
-                        {rawPct >= 80 && !over && (
-                          <div className="bc-warning-msg warn">⚠ Approaching budget limit</div>
-                        )}
-                        {over && (
-                          <div className="bc-warning-msg danger">⊘ Budget exceeded</div>
-                        )}
+                        {rawPct >= 80 && !over && <div className="bc-warning-msg warn">⚠ Approaching budget limit</div>}
+                        {over && <div className="bc-warning-msg danger">⊘ Budget exceeded</div>}
                       </button>
                     </div>
                   )
                 })}
               </div>
             )}
+
+            {/* Unbudgeted spending card */}
+            {unbudgetedTxs.length > 0 && (
+              <div className="unbudgeted-card">
+                <button className="unbudgeted-header" onClick={() => setUnbudgetedExpanded(v => !v)}>
+                  <div className="unbudgeted-left">
+                    <span className="unbudgeted-icon">⚠</span>
+                    <div>
+                      <div className="unbudgeted-title">Unbudgeted Spending</div>
+                      <div className="unbudgeted-subtitle">
+                        {Object.keys(unbudgetedByCat).length} categories · {unbudgetedTxs.length} transactions
+                      </div>
+                    </div>
+                  </div>
+                  <div className="unbudgeted-right">
+                    <div className="unbudgeted-total">{fmtC(unbudgetedTotal)}</div>
+                    {sec(unbudgetedTotal) && <div className="unbudgeted-sec">{sec(unbudgetedTotal)}</div>}
+                    <span className="unbudgeted-chevron">{unbudgetedExpanded ? '▲' : '▼'}</span>
+                  </div>
+                </button>
+
+                {unbudgetedExpanded && (
+                  <div className="unbudgeted-body">
+                    {Object.entries(unbudgetedByCat)
+                      .sort((a,b) => b[1].amount - a[1].amount)
+                      .map(([catName, data]) => {
+                        const catDef = categories.find(c => c.name === catName)
+                        const icon   = catDef?.icon || '📦'
+                        const pct    = unbudgetedTotal > 0 ? Math.round((data.amount/unbudgetedTotal)*100) : 0
+                        return (
+                          <div key={catName} className="unbudgeted-cat-row">
+                            <div className="unbudgeted-cat-info">
+                              <span className="unbudgeted-cat-icon">{icon}</span>
+                              <div>
+                                <div className="unbudgeted-cat-name">{catName}</div>
+                                <div className="unbudgeted-cat-count">{data.count} transaction{data.count !== 1 ? 's' : ''}</div>
+                              </div>
+                            </div>
+                            <div className="unbudgeted-cat-right">
+                              <div className="unbudgeted-cat-amt">{fmt(data.amount)}</div>
+                              {sec(data.amount) && <div className="unbudgeted-cat-sec">{sec(data.amount)}</div>}
+                              <div className="unbudgeted-cat-pct">{pct}%</div>
+                            </div>
+                          </div>
+                        )
+                      })
+                    }
+                    <div className="unbudgeted-txs-title">Recent Transactions</div>
+                    {unbudgetedTxs
+                      .sort((a,b) => (b.date||'').localeCompare(a.date||''))
+                      .slice(0,5)
+                      .map(tx => (
+                        <button key={tx.id} className="unbudgeted-tx-row" onClick={() => setEditTx(tx)}>
+                          <div className="unbudgeted-tx-info">
+                            <div className="unbudgeted-tx-name">{tx.note || tx.category}</div>
+                            <div className="unbudgeted-tx-meta">{tx.category} · {tx.date}</div>
+                          </div>
+                          <div className="unbudgeted-tx-amt">{fmt(tx.amount)}</div>
+                        </button>
+                      ))
+                    }
+                    {unbudgetedTxs.length > 5 && (
+                      <div className="unbudgeted-more">+{unbudgetedTxs.length - 5} more transactions</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>
 
-      {/* Budget detail sheet — shows transactions for that category */}
+      {/* Budget detail sheet */}
       {detailBudget && (
         <>
           <div className="sheet-overlay" onClick={() => setDetailBudget(null)} />
@@ -220,7 +265,6 @@ export default function Budgets() {
               )}
             </div>
             <div className="sheet-body">
-              {/* Budget summary bar */}
               <div className="detail-budget-bar">
                 <div className="detail-budget-nums">
                   <span className="detail-spent">{fmt(spending[detailBudget.category]||0)} spent</span>
@@ -230,25 +274,15 @@ export default function Budgets() {
                   <div className="detail-budget-sec">{sec(spending[detailBudget.category]||0)} spent</div>
                 )}
                 <div className="detail-budget-track">
-                  <div
-                    className="detail-budget-fill"
-                    style={{
-                      width: `${Math.min(((spending[detailBudget.category]||0)/detailBudget.amount)*100, 100)}%`,
-                      background: (spending[detailBudget.category]||0) > detailBudget.amount ? 'var(--red)' : 'var(--green)'
-                    }}
-                  />
+                  <div className="detail-budget-fill" style={{
+                    width: `${Math.min(((spending[detailBudget.category]||0)/detailBudget.amount)*100,100)}%`,
+                    background: (spending[detailBudget.category]||0) > detailBudget.amount ? 'var(--red)' : 'var(--green)'
+                  }} />
                 </div>
               </div>
-
-              {/* Transaction list */}
-              <div className="detail-tx-title">
-                Transactions ({detailTxs.length})
-              </div>
+              <div className="detail-tx-title">Transactions ({detailTxs.length})</div>
               {detailTxs.length === 0 ? (
-                <div className="empty-state">
-                  <span className="icon">💸</span>
-                  <p>No transactions for this category this month.</p>
-                </div>
+                <div className="empty-state"><span className="icon">💸</span><p>No transactions this month.</p></div>
               ) : (
                 detailTxs.map(tx => (
                   <TransactionItem key={tx.id} tx={tx} categories={categories}
@@ -272,10 +306,8 @@ export default function Budgets() {
         />
       )}
 
-      {/* Edit transaction from detail view */}
       {editTx && (
-        <AddTransaction tx={editTx}
-          onClose={() => setEditTx(null)}
+        <AddTransaction tx={editTx} onClose={() => setEditTx(null)}
           onSaved={() => { setEditTx(null); load() }} />
       )}
     </div>
@@ -298,7 +330,7 @@ function BudgetSheet({ budget, categories, existingCategories, onClose, onSaved,
 
   const handleSave = async () => {
     if (!category) return setErr('Select a category')
-    const amt = parseFloat(amount)
+    const amt = parseFloat(amount.replace(/,/g,''))
     if (!amount || isNaN(amt) || amt <= 0) return setErr('Enter a valid amount')
     setErr(''); setSaving(true)
     try {
@@ -339,15 +371,18 @@ function BudgetSheet({ budget, categories, existingCategories, onClose, onSaved,
             <label>Monthly Limit</label>
             <div className="amount-field">
               <span className="currency-sym">{sym}</span>
-              <input type="number" inputMode="decimal" placeholder="0.00"
-                value={amount} onChange={e => setAmount(e.target.value)}
+              <input type="text" inputMode="decimal" placeholder="0.00"
+                value={amount ? parseFloat(amount.replace(/,/g,'')).toLocaleString('en-US',{maximumFractionDigits:2}) : ''}
+                onChange={e => {
+                  const raw = e.target.value.replace(/,/g,'').replace(/[^0-9.]/g,'')
+                  setAmount(raw)
+                }}
                 className="amount-input" autoFocus={!editing} />
             </div>
           </div>
           <div className="field">
             <label>Note (optional)</label>
-            <input type="text" placeholder="e.g. Groceries only"
-              value={note} onChange={e => setNote(e.target.value)} />
+            <input type="text" placeholder="e.g. Groceries only" value={note} onChange={e => setNote(e.target.value)} />
           </div>
           {err && <p className="form-err">{err}</p>}
           <button className="btn btn-primary btn-full save-btn" onClick={handleSave} disabled={saving}>
@@ -361,101 +396,5 @@ function BudgetSheet({ budget, categories, existingCategories, onClose, onSaved,
           onClose={() => setShowCatPicker(false)} title="Pick Category" />
       )}
     </>
-  )
-}
-
-// ── Unbudgeted Spending Card ──────────────────────────────────
-function UnbudgetedCard({ allTxs, budgets, categories, fmt, sec, fmtC, onSelectTx }) {
-  const [expanded, setExpanded] = useState(false)
-
-  // Categories that have a budget
-  const budgetedCats = new Set(budgets.map(b => b.category))
-
-  // Expense transactions with no budget
-  const unbudgetedTxs = allTxs.filter(
-    t => t.type === 'expense' && !budgetedCats.has(t.category)
-  )
-
-  if (unbudgetedTxs.length === 0) return null
-
-  // Group by category
-  const byCategory = {}
-  unbudgetedTxs.forEach(t => {
-    if (!byCategory[t.category]) byCategory[t.category] = { amount: 0, count: 0 }
-    byCategory[t.category].amount += t.amount
-    byCategory[t.category].count  += 1
-  })
-
-  const total = unbudgetedTxs.reduce((a, t) => a + t.amount, 0)
-  const catList = Object.entries(byCategory)
-    .sort((a, b) => b[1].amount - a[1].amount)
-
-  return (
-    <div className="unbudgeted-card">
-      <button className="unbudgeted-header" onClick={() => setExpanded(v => !v)}>
-        <div className="unbudgeted-left">
-          <span className="unbudgeted-icon">⚠</span>
-          <div>
-            <div className="unbudgeted-title">Unbudgeted Spending</div>
-            <div className="unbudgeted-subtitle">
-              {catList.length} categories · {unbudgetedTxs.length} transactions
-            </div>
-          </div>
-        </div>
-        <div className="unbudgeted-right">
-          <div className="unbudgeted-total">{fmtC(total)}</div>
-          {sec(total) && <div className="unbudgeted-sec">{sec(total)}</div>}
-          <span className="unbudgeted-chevron">{expanded ? '▲' : '▼'}</span>
-        </div>
-      </button>
-
-      {expanded && (
-        <div className="unbudgeted-body">
-          {/* Category breakdown */}
-          <div className="unbudgeted-cats">
-            {catList.map(([catName, data]) => {
-              const catDef = categories.find(c => c.name === catName)
-              const icon   = catDef?.icon || '📦'
-              const pct    = total > 0 ? Math.round((data.amount / total) * 100) : 0
-              return (
-                <div key={catName} className="unbudgeted-cat-row">
-                  <div className="unbudgeted-cat-info">
-                    <span className="unbudgeted-cat-icon">{icon}</span>
-                    <div>
-                      <div className="unbudgeted-cat-name">{catName}</div>
-                      <div className="unbudgeted-cat-count">{data.count} transaction{data.count !== 1 ? 's' : ''}</div>
-                    </div>
-                  </div>
-                  <div className="unbudgeted-cat-right">
-                    <div className="unbudgeted-cat-amt">{fmt(data.amount)}</div>
-                    {sec(data.amount) && <div className="unbudgeted-cat-sec">{sec(data.amount)}</div>}
-                    <div className="unbudgeted-cat-pct">{pct}%</div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Recent unbudgeted transactions */}
-          <div className="unbudgeted-txs-title">Recent Transactions</div>
-          {unbudgetedTxs
-            .sort((a, b) => (b.date||'').localeCompare(a.date||''))
-            .slice(0, 5)
-            .map(tx => (
-              <button key={tx.id} className="unbudgeted-tx-row" onClick={() => onSelectTx(tx)}>
-                <div className="unbudgeted-tx-info">
-                  <div className="unbudgeted-tx-name">{tx.note || tx.category}</div>
-                  <div className="unbudgeted-tx-meta">{tx.category} · {tx.date}</div>
-                </div>
-                <div className="unbudgeted-tx-amt">{fmt(tx.amount)}</div>
-              </button>
-            ))
-          }
-          {unbudgetedTxs.length > 5 && (
-            <div className="unbudgeted-more">+{unbudgetedTxs.length - 5} more transactions</div>
-          )}
-        </div>
-      )}
-    </div>
   )
 }
