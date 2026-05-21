@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import {
-  getSavingsAccounts, addSavingsAccount, updateSavingsAccount, deleteSavingsAccount,
+  getSavingsAccounts, addSavingsAccount, deleteSavingsAccount,
   getSavingsTxs, addSavingsTx
 } from '../firebase/savingsLoans'
 import { fmtCurrency, fmtCurrencyCompact, toFirestoreDate } from '../utils/helpers'
@@ -17,18 +17,19 @@ const getSym = c => CURRENCY_SYMBOLS[c] || c
 
 export default function SavingsSheet({ onClose }) {
   const { user, householdId, currency, secEnabled, secCurrency, secRate } = useApp()
-  const [accounts, setAccounts]     = useState([])
-  const [loading, setLoading]       = useState(true)
-  const [view, setView]             = useState('list')      // list | detail | create
+  const [accounts, setAccounts]       = useState([])
+  const [loading, setLoading]         = useState(true)
+  const [view, setView]               = useState('list')
   const [selectedAcc, setSelectedAcc] = useState(null)
-  const [accTxs, setAccTxs]         = useState([])
-  const [txLoading, setTxLoading]   = useState(false)
-  const [toast, setToast]           = useState(null)
+  const [accTxs, setAccTxs]           = useState([])
+  const [txLoading, setTxLoading]     = useState(false)
+  const [toast, setToast]             = useState(null)
 
-  // Create account form
-  const [newName, setNewName]       = useState('')
-  const [newNote, setNewNote]       = useState('')
-  const [creating, setCreating]     = useState(false)
+  // Create form
+  const [newName, setNewName]             = useState('')
+  const [newNote, setNewNote]             = useState('')
+  const [openingBalance, setOpeningBalance] = useState('')
+  const [creating, setCreating]           = useState(false)
 
   // Transaction form
   const [txSubtype, setTxSubtype]   = useState('deposit')
@@ -45,11 +46,11 @@ export default function SavingsSheet({ onClose }) {
     setLoading(true)
     try {
       const accs = await getSavingsAccounts(user.uid, householdId)
-      // Fetch balances for each account
       const withBalances = await Promise.all(accs.map(async acc => {
         const txs = await getSavingsTxs(acc.id)
-        const balance = txs.reduce((a, t) => t.subtype === 'withdraw' ? a - t.amount : a + t.amount, 0)
-        return { ...acc, balance, txCount: txs.length }
+        const balance = txs.reduce((a, t) =>
+          t.subtype === 'withdraw' ? a - t.amount : a + t.amount, 0)
+        return { ...acc, balance, txCount: txs.length, txs }
       }))
       setAccounts(withBalances)
     } finally { setLoading(false) }
@@ -58,6 +59,7 @@ export default function SavingsSheet({ onClose }) {
   const openDetail = async (acc) => {
     setSelectedAcc(acc)
     setView('detail')
+    setShowTxForm(false)
     setTxLoading(true)
     try {
       const txs = await getSavingsTxs(acc.id)
@@ -69,11 +71,21 @@ export default function SavingsSheet({ onClose }) {
     if (!newName.trim()) return
     setCreating(true)
     try {
-      await addSavingsAccount(user.uid, householdId, {
-        name: newName.trim(), note: newNote.trim(), balance: 0
+      const ref = await addSavingsAccount(user.uid, householdId, {
+        name: newName.trim(), note: newNote.trim()
       })
-      setNewName(''); setNewNote('')
-      setToast({ msg: 'Savings account created!', type: 'success' })
+      // If opening balance provided, add it as first deposit
+      const ob = parseFloat(openingBalance.replace(/,/g, ''))
+      if (ob > 0) {
+        await addSavingsTx(ref.id, user.uid, {
+          subtype: 'deposit',
+          amount: ob,
+          note: 'Opening balance',
+          date: toFirestoreDate(new Date())
+        })
+      }
+      setNewName(''); setNewNote(''); setOpeningBalance('')
+      setToast({ msg: '💰 Account created!', type: 'success' })
       await loadAccounts()
       setView('list')
     } finally { setCreating(false) }
@@ -87,7 +99,8 @@ export default function SavingsSheet({ onClose }) {
     await loadAccounts()
   }
 
-  const accountBalance = accTxs.reduce((a, t) => t.subtype === 'withdraw' ? a - t.amount : a + t.amount, 0)
+  const accountBalance = accTxs.reduce((a, t) =>
+    t.subtype === 'withdraw' ? a - t.amount : a + t.amount, 0)
 
   const handleAddTx = async () => {
     const amt = parseFloat(txAmount.replace(/,/g, ''))
@@ -102,10 +115,8 @@ export default function SavingsSheet({ onClose }) {
       })
       setToast({ msg: txSubtype === 'deposit' ? '💰 Deposited!' : '↑ Withdrawn!', type: 'success' })
       setTxAmount(''); setTxNote(''); setShowTxForm(false)
-      // Reload txs
       const txs = await getSavingsTxs(selectedAcc.id)
       setAccTxs(txs.sort((a, b) => (b.date||'').localeCompare(a.date||'')))
-      // Update account balance in list
       await loadAccounts()
     } catch { setTxErr('Save failed.') }
     finally { setTxSaving(false) }
@@ -125,7 +136,7 @@ export default function SavingsSheet({ onClose }) {
       <div className="sheet sheet-tall">
         <div className="sheet-handle" />
 
-        {/* ── LIST VIEW ── */}
+        {/* LIST */}
         {view === 'list' && (
           <>
             <div className="sheet-header">
@@ -134,11 +145,11 @@ export default function SavingsSheet({ onClose }) {
               <button className="btn btn-ghost" onClick={() => setView('create')}>＋ New</button>
             </div>
             <div className="sheet-body">
-              {/* Total across all accounts */}
               <div className="sv-total-card">
-                <div className="sv-total-label">Total Savings</div>
+                <div className="sv-total-label">Total Savings Balance</div>
                 <div className="sv-total-amount">{fmt(totalSavings)}</div>
                 {sec(totalSavings) && <div className="sv-total-sec">{sec(totalSavings)}</div>}
+                <div className="sv-total-sub">{accounts.length} account{accounts.length !== 1 ? 's' : ''}</div>
               </div>
 
               {loading ? (
@@ -157,12 +168,12 @@ export default function SavingsSheet({ onClose }) {
                         <div>
                           <div className="sv-acc-name">{acc.name}</div>
                           {acc.note && <div className="sv-acc-note">{acc.note}</div>}
-                          <div className="sv-acc-count">{acc.txCount} transactions</div>
+                          <div className="sv-acc-count">{acc.txCount} transaction{acc.txCount !== 1 ? 's' : ''}</div>
                         </div>
                       </div>
                       <div className="sv-acc-right">
-                        <div className="sv-acc-balance">{fmt(acc.balance)}</div>
-                        {sec(acc.balance) && <div className="sv-acc-sec">{sec(acc.balance)}</div>}
+                        <div className="sv-acc-balance">{fmt(acc.balance || 0)}</div>
+                        {sec(acc.balance || 0) && <div className="sv-acc-sec">{sec(acc.balance || 0)}</div>}
                         <span className="sv-acc-arrow">›</span>
                       </div>
                     </button>
@@ -173,7 +184,7 @@ export default function SavingsSheet({ onClose }) {
           </>
         )}
 
-        {/* ── CREATE VIEW ── */}
+        {/* CREATE */}
         {view === 'create' && (
           <>
             <div className="sheet-header">
@@ -188,6 +199,24 @@ export default function SavingsSheet({ onClose }) {
                   value={newName} onChange={e => setNewName(e.target.value)} autoFocus />
               </div>
               <div className="field">
+                <label>Opening Balance (optional)</label>
+                <div className="amount-field">
+                  <span className="currency-sym">{sym}</span>
+                  <input
+                    type="text" inputMode="decimal" placeholder="0.00"
+                    value={openingBalance
+                      ? parseFloat(openingBalance.replace(/,/g,'')).toLocaleString('en-US',{maximumFractionDigits:2})
+                      : ''}
+                    onChange={e => {
+                      const raw = e.target.value.replace(/,/g,'').replace(/[^0-9.]/g,'')
+                      setOpeningBalance(raw)
+                    }}
+                    className="amount-input"
+                  />
+                </div>
+                <div className="field-hint">Existing savings you want to track from today</div>
+              </div>
+              <div className="field">
                 <label>Note (optional)</label>
                 <input type="text" placeholder="What is this savings for?"
                   value={newNote} onChange={e => setNewNote(e.target.value)} />
@@ -200,7 +229,7 @@ export default function SavingsSheet({ onClose }) {
           </>
         )}
 
-        {/* ── DETAIL VIEW ── */}
+        {/* DETAIL */}
         {view === 'detail' && selectedAcc && (
           <>
             <div className="sheet-header">
@@ -209,7 +238,6 @@ export default function SavingsSheet({ onClose }) {
               <button className="btn btn-ghost danger-ghost" onClick={handleDeleteAccount}>🗑</button>
             </div>
             <div className="sheet-body">
-              {/* Account balance card */}
               <div className="sv-detail-card">
                 <div className="sv-detail-label">Balance</div>
                 <div className="sv-detail-amount">{fmt(accountBalance)}</div>
@@ -231,7 +259,6 @@ export default function SavingsSheet({ onClose }) {
                 </div>
               </div>
 
-              {/* Action buttons */}
               <div className="sv-action-row">
                 <button className="sv-action-btn deposit"
                   onClick={() => { setTxSubtype('deposit'); setShowTxForm(true) }}>
@@ -243,7 +270,6 @@ export default function SavingsSheet({ onClose }) {
                 </button>
               </div>
 
-              {/* Transaction form */}
               {showTxForm && (
                 <div className="sv-tx-form">
                   <div className="sv-tx-form-title">
@@ -252,7 +278,9 @@ export default function SavingsSheet({ onClose }) {
                   <div className="amount-field">
                     <span className="currency-sym">{sym}</span>
                     <input type="text" inputMode="decimal" placeholder="0.00"
-                      value={txAmount ? parseFloat(txAmount.replace(/,/g,'')).toLocaleString('en-US',{maximumFractionDigits:2}) : ''}
+                      value={txAmount
+                        ? parseFloat(txAmount.replace(/,/g,'')).toLocaleString('en-US',{maximumFractionDigits:2})
+                        : ''}
                       onChange={e => {
                         const raw = e.target.value.replace(/,/g,'').replace(/[^0-9.]/g,'')
                         setTxAmount(raw)
@@ -270,7 +298,8 @@ export default function SavingsSheet({ onClose }) {
                   </div>
                   {txErr && <p className="form-err">{txErr}</p>}
                   <div className="sv-tx-form-btns">
-                    <button className="btn btn-secondary" onClick={() => { setShowTxForm(false); setTxErr('') }}>Cancel</button>
+                    <button className="btn btn-secondary"
+                      onClick={() => { setShowTxForm(false); setTxErr('') }}>Cancel</button>
                     <button className={`btn ${txSubtype === 'deposit' ? 'btn-deposit' : 'btn-withdraw'}`}
                       onClick={handleAddTx} disabled={txSaving}>
                       {txSaving ? <span className="spinner" /> : txSubtype === 'deposit' ? 'Deposit' : 'Withdraw'}
@@ -279,18 +308,14 @@ export default function SavingsSheet({ onClose }) {
                 </div>
               )}
 
-              {/* Transaction history */}
-              <div className="sv-history-title">History ({accTxs.length})</div>
+              <div className="sv-history-title">Transactions ({accTxs.length})</div>
               {txLoading ? (
                 <div className="load-row"><span className="spinner" /></div>
               ) : accTxs.length === 0 ? (
-                <div className="empty-state">
-                  <span className="icon">💰</span>
-                  <p>No transactions yet.</p>
-                </div>
+                <div className="empty-state"><span className="icon">💰</span><p>No transactions yet.</p></div>
               ) : (
-                accTxs.map(tx => (
-                  <div key={tx.id} className="sv-tx-row">
+                accTxs.map((tx, i) => (
+                  <div key={tx.id || i} className="sv-tx-row">
                     <div className={`sv-tx-badge ${tx.subtype}`}>
                       {tx.subtype === 'deposit' ? '↓' : '↑'}
                     </div>
@@ -301,8 +326,11 @@ export default function SavingsSheet({ onClose }) {
                       </div>
                       <div className="sv-tx-date">{tx.date}</div>
                     </div>
-                    <div className={`sv-tx-amount ${tx.subtype}`}>
-                      {tx.subtype === 'deposit' ? '+' : '-'}{fmt(tx.amount)}
+                    <div className="sv-tx-right">
+                      <div className={`sv-tx-amount ${tx.subtype}`}>
+                        {tx.subtype === 'deposit' ? '+' : '-'}{fmt(tx.amount)}
+                      </div>
+                      {sec(tx.amount) && <div className="sv-tx-sec">{sec(tx.amount)}</div>}
                     </div>
                   </div>
                 ))

@@ -8,16 +8,15 @@
 }
 .sv-total-card::before {
   content: ''; position: absolute; top: -30px; right: -30px;
-  width: 110px; height: 110px; border-radius: 50%;
-  background: rgba(255,255,255,0.1);
+  width: 110px; height: 110px; border-radius: 50%; background: rgba(255,255,255,0.1);
 }
 .sv-total-label  { font-size: 11px; font-weight: 600; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.08em; }
-.sv-total-amount { font-size: clamp(26px, 7vw, 36px); font-weight: 800; margin: 6px 0 2px; }
+.sv-total-amount { font-size: clamp(26px, 7vw, 36px); font-weight: 800; margin: 6px 0 2px; position: relative; z-index: 1; }
 .sv-total-sec    { font-size: 13px; opacity: 0.7; font-weight: 600; }
+.sv-total-sub    { font-size: 12px; opacity: 0.6; margin-top: 4px; }
 
 /* Account list */
 .sv-account-list { display: flex; flex-direction: column; gap: 10px; }
-
 .sv-account-card {
   width: 100%; display: flex; align-items: center; justify-content: space-between;
   background: var(--bg-elevated); border: 1px solid var(--border);
@@ -25,17 +24,18 @@
   text-align: left; gap: 12px; transition: opacity var(--transition);
 }
 .sv-account-card:active { opacity: 0.7; }
-
-.sv-acc-left { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
-.sv-acc-icon { font-size: 26px; flex-shrink: 0; }
+.sv-acc-left  { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+.sv-acc-icon  { font-size: 26px; flex-shrink: 0; }
 .sv-acc-name  { font-size: 15px; font-weight: 700; color: var(--text-primary); }
 .sv-acc-note  { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
 .sv-acc-count { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-
 .sv-acc-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
 .sv-acc-balance { font-size: 16px; font-weight: 800; color: #f5a623; }
-.sv-acc-sec     { font-size: 11px; color: var(--text-muted); }
-.sv-acc-arrow   { font-size: 18px; color: var(--text-muted); }
+.sv-acc-sec   { font-size: 11px; color: var(--text-muted); }
+.sv-acc-arrow { font-size: 18px; color: var(--text-muted); margin-top: 2px; }
+
+/* Field hint */
+.field-hint { font-size: 11px; color: var(--text-muted); margin-top: 6px; font-style: italic; }
 
 /* Detail card */
 .sv-detail-card {
@@ -48,7 +48,7 @@
   width: 110px; height: 110px; border-radius: 50%; background: rgba(255,255,255,0.1);
 }
 .sv-detail-label  { font-size: 11px; font-weight: 600; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.08em; }
-.sv-detail-amount { font-size: clamp(26px, 7vw, 36px); font-weight: 800; margin: 6px 0 2px; }
+.sv-detail-amount { font-size: clamp(26px, 7vw, 36px); font-weight: 800; margin: 6px 0 2px; position: relative; z-index:1; }
 .sv-detail-sec    { font-size: 13px; opacity: 0.7; font-weight: 600; margin-bottom: 14px; }
 .sv-detail-stats  { display: flex; align-items: center; background: rgba(255,255,255,0.15); border-radius: 10px; padding: 10px 14px; }
 .sv-detail-divider { width: 1px; height: 32px; background: rgba(255,255,255,0.25); margin: 0 16px; }
@@ -58,9 +58,7 @@
 .sv-detail-stat-val.withdraw { color: rgba(255,255,255,0.8); }
 
 /* Action buttons */
-.sv-action-row {
-  display: flex; gap: 10px; margin-bottom: 16px;
-}
+.sv-action-row { display: flex; gap: 10px; margin-bottom: 16px; }
 .sv-action-btn {
   flex: 1; padding: 14px; border-radius: var(--radius-md);
   font-size: 15px; font-weight: 700; transition: all var(--transition);
@@ -74,40 +72,23 @@
   background: var(--bg-elevated); border: 1px solid var(--border);
   border-radius: var(--radius-md); padding: 16px; margin-bottom: 16px;
 }
-.sv-tx-form-title {
-  font-size: 14px; font-weight: 700; color: var(--text-primary);
-  margin-bottom: 14px;
-}
-.sv-tx-form-btns {
-  display: flex; gap: 10px; margin-top: 4px;
-}
+.sv-tx-form-title { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 14px; }
+.sv-tx-form-btns  { display: flex; gap: 10px; margin-top: 4px; }
 .btn-deposit  { background: var(--green); color: #fff; border-radius: var(--radius-sm); padding: 13px 20px; font-size: 15px; font-weight: 600; flex: 1; }
 .btn-withdraw { background: var(--accent); color: #fff; border-radius: var(--radius-sm); padding: 13px 20px; font-size: 15px; font-weight: 600; flex: 1; }
 
 /* History */
-.sv-history-title {
-  font-size: 14px; font-weight: 700; color: var(--text-primary);
-  margin-bottom: 12px; padding-top: 4px; border-top: 1px solid var(--border);
-}
-
-.sv-tx-row {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 0; border-bottom: 1px solid var(--border);
-}
+.sv-history-title { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.sv-tx-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
 .sv-tx-row:last-child { border-bottom: none; }
-
-.sv-tx-badge {
-  width: 36px; height: 36px; border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 16px; font-weight: 800; flex-shrink: 0;
-}
+.sv-tx-badge { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 800; flex-shrink: 0; }
 .sv-tx-badge.deposit  { background: rgba(0,196,140,0.15); color: var(--green); }
 .sv-tx-badge.withdraw { background: rgba(232,66,26,0.12);  color: var(--accent); }
-
 .sv-tx-info  { flex: 1; min-width: 0; }
 .sv-tx-label { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sv-tx-date  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-
-.sv-tx-amount          { font-size: 14px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+.sv-tx-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.sv-tx-amount         { font-size: 14px; font-weight: 700; white-space: nowrap; }
 .sv-tx-amount.deposit  { color: var(--green); }
 .sv-tx-amount.withdraw { color: var(--accent); }
+.sv-tx-sec { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
