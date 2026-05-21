@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import { getTransactions } from '../firebase/service'
+import { getSavingsAccounts, getSavingsTxs, getLoanAccounts, getLoanTxs } from '../firebase/savingsLoans'
 import { groupByCategory, fmtCurrency, fmtCurrencyCompact, toFirestoreDate } from '../utils/helpers'
 import { fmtSec } from '../utils/secCurrency'
-import { calcSavingsBalance, calcLoanBalance } from '../utils/balanceCalc'
 import {
   startOfMonth, endOfMonth, startOfYear, endOfYear,
   startOfWeek, endOfWeek, addMonths, subMonths,
@@ -75,12 +75,10 @@ function squarify(items, x, y, w, h) {
   const results = []
   let remaining = [...items]
   let cx = x, cy = y, cw = w, ch = h
-
   while (remaining.length) {
     const horiz = cw >= ch
     const lineLen = horiz ? cw : ch
     let batch = [], batchSum = 0, bestRatio = Infinity
-
     for (let i = 0; i < remaining.length; i++) {
       const item = remaining[i]
       const newBatch = [...batch, item]
@@ -97,7 +95,6 @@ function squarify(items, x, y, w, h) {
       if (worst > bestRatio) break
       bestRatio = worst; batch = newBatch; batchSum = newSum
     }
-
     const batchArea = (batchSum / total) * (cw * ch)
     const side = batchArea / lineLen
     let offset = 0
@@ -113,8 +110,7 @@ function squarify(items, x, y, w, h) {
       })
       offset += bLen
     }
-    if (horiz) { cx += side; cw -= side }
-    else { cy += side; ch -= side }
+    if (horiz) { cx += side; cw -= side } else { cy += side; ch -= side }
     remaining = remaining.slice(batch.length)
   }
   return results
@@ -123,7 +119,6 @@ function squarify(items, x, y, w, h) {
 function Treemap({ data, colors, fmt, fmtC, onSelect }) {
   const containerRef = useRef(null)
   const [dims, setDims] = useState({ w: 0, h: 0 })
-
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -134,12 +129,10 @@ function Treemap({ data, colors, fmt, fmtC, onSelect }) {
     obs.observe(el)
     return () => obs.disconnect()
   }, [])
-
   const total = data.reduce((s, d) => s + d.amount, 0)
   const items = data.map((d, i) => ({ ...d, value: d.amount, color: colors[i % colors.length] }))
   const { w, h } = dims
   const rects = w > 0 && h > 0 ? squarify(items, 0, 0, w, h) : []
-
   return (
     <div ref={containerRef} className="treemap-container">
       {rects.map((r, i) => {
@@ -173,7 +166,6 @@ export default function Stats() {
   const [customEnd, setCustomEnd]     = useState(toFirestoreDate(endOfMonth(new Date())))
   const [txType, setTxType]           = useState('expense')
   const [transactions, setTransactions] = useState([])
-  const [allTimeTxs, setAllTimeTxs]   = useState([])
   const [loading, setLoading]         = useState(true)
   const [drillCat, setDrillCat]       = useState(null)
   const [drillSub, setDrillSub]       = useState(null)
@@ -181,19 +173,45 @@ export default function Stats() {
   const [showSavings, setShowSavings] = useState(false)
   const [showLoans, setShowLoans]     = useState(false)
 
+  // Real savings & loan balances from their own collections
+  const [savingsBalance, setSavingsBalance] = useState(0)
+  const [loanBalance, setLoanBalance]       = useState(0)
+
   useEffect(() => { load() }, [period, anchor, customStart, customEnd, householdId, reloadTrigger])
 
-  // Also load all-time for savings/loan balances
-  useEffect(() => {
-    if (!user) return
-    getTransactions(user.uid, householdId, '2000-01-01', '2099-12-31')
-      .then(setAllTimeTxs).catch(console.error)
-  }, [householdId, reloadTrigger])
+  // Load real savings/loan balances on mount and whenever sheets close
+  useEffect(() => { loadSavingsLoans() }, [householdId, showSavings, showLoans])
+
+  const loadSavingsLoans = async () => {
+    try {
+      const [savAccs, loanAccs] = await Promise.all([
+        getSavingsAccounts(user.uid, householdId),
+        getLoanAccounts(user.uid, householdId)
+      ])
+      // Sum balances across all savings accounts
+      const savTotals = await Promise.all(savAccs.map(acc => getSavingsTxs(acc.id)))
+      const totalSavings = savTotals.flat().reduce((a, t) =>
+        t.subtype === 'withdraw' ? a - t.amount : a + t.amount, 0)
+      setSavingsBalance(totalSavings)
+
+      // Sum outstanding across all loan accounts
+      const loanTotals = await Promise.all(loanAccs.map(acc => getLoanTxs(acc.id)))
+      const totalLoans = loanTotals.flat().reduce((a, t) =>
+        t.subtype === 'repay' ? a - t.amount : a + t.amount, 0)
+      setLoanBalance(Math.max(0, totalLoans))
+    } catch (e) { console.error('loadSavingsLoans error:', e) }
+  }
 
   const getRange = () => {
     if (period === 'Custom')   return { start: customStart, end: customEnd }
-    if (period === 'Weekly')   return { start: toFirestoreDate(startOfWeek(anchor, { weekStartsOn: 1 })), end: toFirestoreDate(endOfWeek(anchor, { weekStartsOn: 1 })) }
-    if (period === 'Annually') return { start: toFirestoreDate(startOfYear(anchor)), end: toFirestoreDate(endOfYear(anchor)) }
+    if (period === 'Weekly')   return {
+      start: toFirestoreDate(startOfWeek(anchor, { weekStartsOn: 1 })),
+      end:   toFirestoreDate(endOfWeek(anchor, { weekStartsOn: 1 }))
+    }
+    if (period === 'Annually') return {
+      start: toFirestoreDate(startOfYear(anchor)),
+      end:   toFirestoreDate(endOfYear(anchor))
+    }
     return { start: toFirestoreDate(startOfMonth(anchor)), end: toFirestoreDate(endOfMonth(anchor)) }
   }
 
@@ -210,15 +228,7 @@ export default function Stats() {
   const fmtC = n => fmtCurrencyCompact(n, currency)
   const sec  = n => fmtSec(n, secEnabled, secRate, secCurrency)
 
-  // Savings/Loans use all-time transactions for balance
-  const savingsBalance = calcSavingsBalance(allTimeTxs)
-  const loanBalance    = calcLoanBalance(allTimeTxs)
-
-  // Only expense/income use the period-based breakdown
-  const breakdown = ['expense', 'income'].includes(txType)
-    ? groupByCategory(transactions, txType)
-    : []
-
+  const breakdown = groupByCategory(transactions, txType)
   const totalByType = (type) => transactions.filter(t => t.type === type).reduce((a,t) => a+t.amount, 0)
 
   const catTxs = drillCat ? transactions.filter(t => t.type === txType && t.category === drillCat) : []
@@ -237,11 +247,19 @@ export default function Stats() {
     : []
 
   const periodLabel = () => {
-    if (period === 'Weekly')   return `Week of ${format(startOfWeek(anchor, { weekStartsOn: 1 }), 'MMM d')}`
+    if (period === 'Weekly')   return `Week of ${format(startOfWeek(anchor,{weekStartsOn:1}),'MMM d')}`
     if (period === 'Annually') return format(anchor, 'yyyy')
     if (period === 'Monthly')  return format(anchor, 'MMMM yyyy')
     return `${customStart} → ${customEnd}`
   }
+
+  // 4 tabs — Savings & Loans use real balances, not period totals
+  const TABS = [
+    { key: 'expense', label: 'Exp.',    colorClass: 'expense', total: fmtC(totalByType('expense')), secTotal: sec(totalByType('expense')), isBalance: false },
+    { key: 'income',  label: 'Income',  colorClass: 'income',  total: fmtC(totalByType('income')),  secTotal: sec(totalByType('income')),  isBalance: false },
+    { key: 'savings', label: '💰 Sav.', colorClass: 'savings', total: fmtC(savingsBalance),          secTotal: sec(savingsBalance),          isBalance: true  },
+    { key: 'loans',   label: '🏦 Loans',colorClass: 'loans',   total: fmtC(loanBalance),             secTotal: sec(loanBalance),             isBalance: true  },
+  ]
 
   const handleTabClick = (key) => {
     setDrillCat(null); setDrillSub(null)
@@ -249,13 +267,6 @@ export default function Stats() {
     if (key === 'loans')   { setShowLoans(true);   return }
     setTxType(key)
   }
-
-  const TABS = [
-    { key: 'expense', label: 'Exp.',   colorClass: 'expense', total: fmtC(totalByType('expense')), secTotal: sec(totalByType('expense')) },
-    { key: 'income',  label: 'Income', colorClass: 'income',  total: fmtC(totalByType('income')),  secTotal: sec(totalByType('income'))  },
-    { key: 'savings', label: '💰 Sav.',colorClass: 'savings', total: fmtC(savingsBalance),         secTotal: sec(savingsBalance), isBalance: true },
-    { key: 'loans',   label: '🏦 Loans',colorClass:'loans',   total: fmtC(loanBalance),            secTotal: sec(loanBalance),   isBalance: true },
-  ]
 
   return (
     <div className="stats-screen">
@@ -342,7 +353,7 @@ export default function Stats() {
         )}
       </div>
 
-      {/* Drill sheets */}
+      {/* Drill level 1 */}
       {drillCat && !drillSub && (
         <>
           <div className="sheet-overlay" onClick={() => setDrillCat(null)} />
@@ -369,7 +380,7 @@ export default function Stats() {
                   {subBreakdown.map((sub, i) => (
                     <button key={sub.name} className="drill-sub-row" onClick={() => setDrillSub(sub.name)}>
                       <div className="drill-sub-left">
-                        <div className="drill-sub-dot" style={{ background: COLORS[i % COLORS.length] }} />
+                        <div className="drill-sub-dot" style={{ background: COLORS[i%COLORS.length] }} />
                         <div>
                           <div className="drill-sub-name">{sub.name}</div>
                           <div className="drill-sub-amt">{fmt(sub.amount)}</div>
@@ -389,6 +400,7 @@ export default function Stats() {
         </>
       )}
 
+      {/* Drill level 2 */}
       {drillCat && drillSub && (
         <>
           <div className="sheet-overlay" onClick={() => setDrillSub(null)} />
@@ -419,12 +431,11 @@ export default function Stats() {
           onSaved={() => { setEditTx(null); load() }} />
       )}
 
-      {/* Savings & Loans sheets */}
       {showSavings && (
-        <SavingsSheet onClose={() => setShowSavings(false)} onSaved={() => { setShowSavings(false); load() }} />
+        <SavingsSheet onClose={() => { setShowSavings(false); loadSavingsLoans() }} />
       )}
       {showLoans && (
-        <LoansSheet onClose={() => setShowLoans(false)} onSaved={() => { setShowLoans(false); load() }} />
+        <LoansSheet onClose={() => { setShowLoans(false); loadSavingsLoans() }} />
       )}
     </div>
   )

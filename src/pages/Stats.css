@@ -34,7 +34,7 @@
 }
 .custom-range span { color: var(--text-muted); font-weight: 600; }
 
-/* 4-type tabs */
+/* 4 type tabs */
 .stats-type-tabs {
   display: flex; border-bottom: 1px solid var(--border);
   padding: 0 12px; flex-shrink: 0;
@@ -76,16 +76,12 @@
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   height: 100%; width: 100%;
 }
-.treemap-container {
-  position: relative; width: 100%; height: 100%;
-  border-radius: var(--radius-md); overflow: hidden;
-}
+.treemap-container { position: relative; width: 100%; height: 100%; border-radius: var(--radius-md); overflow: hidden; }
 .treemap-cell {
   position: absolute; border-radius: 4px; overflow: hidden;
   display: flex; align-items: flex-start; justify-content: flex-start;
   padding: 5px 6px; cursor: pointer; border: none;
-  box-shadow: inset 0 0 0 1.5px rgba(0,0,0,0.2);
-  transition: filter var(--transition);
+  box-shadow: inset 0 0 0 1.5px rgba(0,0,0,0.2); transition: filter var(--transition);
 }
 .treemap-cell:active { filter: brightness(0.85); }
 .treemap-label { display: flex; flex-direction: column; gap: 1px; width: 100%; pointer-events: none; }
