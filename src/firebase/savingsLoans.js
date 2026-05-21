@@ -1,92 +1,63 @@
-import {
-  collection, doc, addDoc, updateDoc, deleteDoc,
-  getDocs, query, where, orderBy, serverTimestamp, getDoc
-} from 'firebase/firestore'
+import { collection, doc, addDoc, updateDoc, deleteDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore'
 import { db } from './config'
 
-const ownerId = (userId, householdId) => householdId || userId
-
-// ── Savings Accounts ────────────────────────────────────────────
+// ── Savings Accounts ──────────────────────────────────────────
 export const getSavingsAccounts = async (userId, householdId) => {
-  const snap = await getDocs(query(
-    collection(db, 'savings_accounts'),
-    where('ownerId', '==', ownerId(userId, householdId))
-  ))
+  const ownerId = householdId || userId
+  const snap = await getDocs(query(collection(db, 'savingsAccounts'), where('ownerId', '==', ownerId)))
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
 }
 
 export const addSavingsAccount = async (userId, householdId, data) => {
-  return addDoc(collection(db, 'savings_accounts'), {
-    ...data,
-    balance: 0,
-    ownerId: ownerId(userId, householdId),
-    createdBy: userId,
-    createdAt: serverTimestamp()
+  return addDoc(collection(db, 'savingsAccounts'), {
+    ...data, ownerId: householdId || userId, createdBy: userId, createdAt: serverTimestamp()
   })
 }
 
 export const updateSavingsAccount = async (id, data) => {
-  return updateDoc(doc(db, 'savings_accounts', id), { ...data, updatedAt: serverTimestamp() })
+  return updateDoc(doc(db, 'savingsAccounts', id), { ...data, updatedAt: serverTimestamp() })
 }
 
-export const deleteSavingsAccount = async (id) => {
-  return deleteDoc(doc(db, 'savings_accounts', id))
-}
+export const deleteSavingsAccount = async (id) => deleteDoc(doc(db, 'savingsAccounts', id))
 
-// ── Savings Transactions ────────────────────────────────────────
-export const getSavingsTransactions = async (accountId) => {
-  const snap = await getDocs(query(
-    collection(db, 'savings_transactions'),
-    where('accountId', '==', accountId)
-  ))
+// Transactions within a savings account
+export const getSavingsTxs = async (accountId) => {
+  const snap = await getDocs(query(collection(db, 'savingsTxs'), where('accountId', '==', accountId)))
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
 }
 
-export const addSavingsTransaction = async (accountId, data) => {
-  return addDoc(collection(db, 'savings_transactions'), {
-    ...data, accountId, createdAt: serverTimestamp()
+export const addSavingsTx = async (accountId, userId, data) => {
+  return addDoc(collection(db, 'savingsTxs'), {
+    ...data, accountId, createdBy: userId, createdAt: serverTimestamp()
   })
 }
 
-// ── Loans ───────────────────────────────────────────────────────
-export const getLoans = async (userId, householdId) => {
-  const snap = await getDocs(query(
-    collection(db, 'loans'),
-    where('ownerId', '==', ownerId(userId, householdId))
-  ))
+// ── Loan Accounts ─────────────────────────────────────────────
+export const getLoanAccounts = async (userId, householdId) => {
+  const ownerId = householdId || userId
+  const snap = await getDocs(query(collection(db, 'loanAccounts'), where('ownerId', '==', ownerId)))
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
 }
 
-export const addLoan = async (userId, householdId, data) => {
-  return addDoc(collection(db, 'loans'), {
-    ...data,
-    remainingBalance: data.principal,
-    ownerId: ownerId(userId, householdId),
-    createdBy: userId,
-    createdAt: serverTimestamp()
+export const addLoanAccount = async (userId, householdId, data) => {
+  return addDoc(collection(db, 'loanAccounts'), {
+    ...data, ownerId: householdId || userId, createdBy: userId, createdAt: serverTimestamp()
   })
 }
 
-export const updateLoan = async (id, data) => {
-  return updateDoc(doc(db, 'loans', id), { ...data, updatedAt: serverTimestamp() })
+export const updateLoanAccount = async (id, data) => {
+  return updateDoc(doc(db, 'loanAccounts', id), { ...data, updatedAt: serverTimestamp() })
 }
 
-export const deleteLoan = async (id) => {
-  return deleteDoc(doc(db, 'loans', id))
-}
+export const deleteLoanAccount = async (id) => deleteDoc(doc(db, 'loanAccounts', id))
 
-export const getLoanPayments = async (loanId) => {
-  const snap = await getDocs(query(
-    collection(db, 'loan_payments'),
-    where('loanId', '==', loanId)
-  ))
+export const getLoanTxs = async (accountId) => {
+  const snap = await getDocs(query(collection(db, 'loanTxs'), where('accountId', '==', accountId)))
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
 }
 
-export const addLoanPayment = async (loanId, data) => {
-  return addDoc(collection(db, 'loan_payments'), {
-    ...data, loanId, createdAt: serverTimestamp()
+export const addLoanTx = async (accountId, userId, data) => {
+  return addDoc(collection(db, 'loanTxs'), {
+    ...data, accountId, createdBy: userId, createdAt: serverTimestamp()
   })
 }
