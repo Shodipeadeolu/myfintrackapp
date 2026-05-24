@@ -153,7 +153,12 @@ export default function Budgets() {
                       <button className="bc-card-inner" onClick={() => setDetailBudget(budget)}>
                         <div className="bc-card-header">
                           <div>
-                            <div className="bc-card-name">{icon} {budget.category}</div>
+                            <div className="bc-card-name">
+                              {icon} {budget.category}
+                              {budget.recurring !== false && (
+                                <span className="bc-recurring-badge">↻</span>
+                              )}
+                            </div>
                             <div className="bc-card-amounts">{fmt(spent)} of {fmt(budget.amount)}</div>
                             {sec(spent) && <div className="bc-card-amounts-sec">{sec(spent)} of {sec(budget.amount)}</div>}
                           </div>
@@ -319,6 +324,7 @@ function BudgetSheet({ budget, categories, existingCategories, onClose, onSaved,
   const [category, setCategory] = useState(budget?.category||'')
   const [amount, setAmount]     = useState(budget?.amount ? String(budget.amount) : '')
   const [note, setNote]         = useState(budget?.note||'')
+  const [recurring, setRecurring] = useState(budget?.recurring ?? true)
   const [saving, setSaving]     = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [err, setErr]           = useState('')
@@ -334,7 +340,7 @@ function BudgetSheet({ budget, categories, existingCategories, onClose, onSaved,
     if (!amount || isNaN(amt) || amt <= 0) return setErr('Enter a valid amount')
     setErr(''); setSaving(true)
     try {
-      const data = { category, amount: amt, note: note.trim() }
+      const data = { category, amount: amt, note: note.trim(), recurring }
       editing ? await updateBudget(budget.id, data) : await addBudget(user.uid, householdId, data)
       onSaved()
     } catch { setErr('Save failed.') } finally { setSaving(false) }
@@ -384,6 +390,20 @@ function BudgetSheet({ budget, categories, existingCategories, onClose, onSaved,
             <label>Note (optional)</label>
             <input type="text" placeholder="e.g. Groceries only" value={note} onChange={e => setNote(e.target.value)} />
           </div>
+          {/* Recurring toggle */}
+          <div className="budget-recurring-row">
+            <div className="budget-recurring-info">
+              <div className="budget-recurring-label">Repeat Every Month</div>
+              <div className="budget-recurring-desc">Auto-carry this budget to the next month</div>
+            </div>
+            <button
+              className={`profile-toggle ${recurring ? 'on' : 'off'}`}
+              onClick={() => setRecurring(v => !v)}
+            >
+              <div className="profile-toggle-knob" />
+            </button>
+          </div>
+
           {err && <p className="form-err">{err}</p>}
           <button className="btn btn-primary btn-full save-btn" onClick={handleSave} disabled={saving}>
             {saving ? <span className="spinner" /> : editing ? 'Save Changes' : 'Add Budget'}
