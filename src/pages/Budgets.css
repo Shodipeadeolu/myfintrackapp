@@ -159,3 +159,34 @@
   padding: 1px 5px; border-radius: 6px;
   margin-left: 4px; vertical-align: middle;
 }
+
+/* Subcategory rows in budget detail */
+.detail-subcat-row {
+  width: 100%; display: flex; align-items: center; gap: 12px;
+  padding: 13px 0; border-bottom: 1px solid var(--border);
+  text-align: left; transition: opacity var(--transition);
+}
+.detail-subcat-row:last-of-type { border-bottom: none; }
+.detail-subcat-row:active { opacity: 0.6; }
+
+.detail-subcat-left { flex: 1; min-width: 0; }
+.detail-subcat-name {
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.detail-subcat-count { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+.detail-subcat-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.detail-subcat-amt   { font-size: 14px; font-weight: 700; color: var(--text-primary); white-space: nowrap; }
+.detail-subcat-sec   { font-size: 11px; color: var(--text-muted); }
+.detail-subcat-pct   { font-size: 11px; color: var(--text-muted); }
+.detail-subcat-arrow { font-size: 20px; color: var(--text-muted); flex-shrink: 0; }
+
+/* Drill summary */
+.detail-drill-summary {
+  font-size: 13px; color: var(--text-muted); font-weight: 600;
+  margin-bottom: 16px;
+}
+.detail-drill-total { color: var(--text-primary); font-size: 15px; font-weight: 800; }
+.detail-drill-sec   { color: var(--text-muted); }
+.detail-drill-count { color: var(--text-muted); }

@@ -29,6 +29,7 @@ export default function Budgets() {
   const [showAdd, setShowAdd]       = useState(false)
   const [editBudget, setEditBudget] = useState(null)
   const [detailBudget, setDetailBudget] = useState(null)
+  const [drillSubcat, setDrillSubcat]   = useState(null)  // null = subcategory list, string = tx list
   const [editTx, setEditTx]         = useState(null)
 
   useEffect(() => { load() }, [month, householdId, reloadTrigger])
@@ -71,6 +72,22 @@ export default function Budgets() {
 
   const detailTxs = detailBudget
     ? allTxs.filter(t => t.type === 'expense' && t.category === detailBudget.category)
+    : []
+
+  // Group detailTxs by subcategory
+  const detailBySubcat = detailTxs.reduce((acc, tx) => {
+    const key = tx.subcategory?.trim() || '(no subcategory)'
+    if (!acc[key]) acc[key] = { txs: [], total: 0 }
+    acc[key].txs.push(tx)
+    acc[key].total += tx.amount
+    return acc
+  }, {})
+  const detailSubcats = Object.entries(detailBySubcat)
+    .sort((a, b) => b[1].total - a[1].total)
+
+  // Transactions for drilled subcategory
+  const drillTxs = drillSubcat
+    ? (detailBySubcat[drillSubcat]?.txs || []).sort((a,b) => (b.date||'').localeCompare(a.date||''))
     : []
 
   // Unbudgeted spending
@@ -263,7 +280,7 @@ export default function Budgets() {
           <div className="sheet">
             <div className="sheet-handle" />
             <div className="sheet-header">
-              <button className="btn btn-ghost" onClick={() => setDetailBudget(null)}>✕</button>
+              <button className="btn btn-ghost" onClick={() => { setDetailBudget(null); setDrillSubcat(null) }}>✕</button>
               <span className="sheet-title">{detailBudget.category}</span>
               {canWrite && (
                 <button className="btn btn-ghost" onClick={() => { setDetailBudget(null); setEditBudget(detailBudget) }}>✎ Edit</button>
@@ -285,15 +302,75 @@ export default function Budgets() {
                   }} />
                 </div>
               </div>
-              <div className="detail-tx-title">Transactions ({detailTxs.length})</div>
+              {/* Subcategory breakdown */}
               {detailTxs.length === 0 ? (
                 <div className="empty-state"><span className="icon">💸</span><p>No transactions this month.</p></div>
+              ) : detailSubcats.length === 1 && detailSubcats[0][0] === '(no subcategory)' ? (
+                // No subcategories — show transactions directly
+                <>
+                  <div className="detail-tx-title">Transactions ({detailTxs.length})</div>
+                  {detailTxs
+                    .sort((a,b) => (b.date||'').localeCompare(a.date||''))
+                    .map(tx => (
+                      <TransactionItem key={tx.id} tx={tx} categories={categories}
+                        onClick={t => { setDetailBudget(null); setEditTx(t) }} />
+                    ))
+                  }
+                </>
               ) : (
-                detailTxs.map(tx => (
-                  <TransactionItem key={tx.id} tx={tx} categories={categories}
-                    onClick={t => { setDetailBudget(null); setEditTx(t) }} />
-                ))
+                // Has subcategories — show subcategory list
+                <>
+                  <div className="detail-tx-title">By Subcategory ({detailTxs.length} transactions)</div>
+                  {detailSubcats.map(([subcat, data]) => {
+                    const pct = detailTxs.reduce((a,t) => a+t.amount,0) > 0
+                      ? Math.round((data.total / detailTxs.reduce((a,t)=>a+t.amount,0)) * 100)
+                      : 0
+                    return (
+                      <button key={subcat} className="detail-subcat-row"
+                        onClick={() => setDrillSubcat(subcat)}>
+                        <div className="detail-subcat-left">
+                          <div className="detail-subcat-name">{subcat}</div>
+                          <div className="detail-subcat-count">{data.txs.length} transaction{data.txs.length !== 1 ? 's' : ''}</div>
+                        </div>
+                        <div className="detail-subcat-right">
+                          <div className="detail-subcat-amt">{fmt(data.total)}</div>
+                          {sec(data.total) && <div className="detail-subcat-sec">{sec(data.total)}</div>}
+                          <div className="detail-subcat-pct">{pct}%</div>
+                        </div>
+                        <span className="detail-subcat-arrow">›</span>
+                      </button>
+                    )
+                  })}
+                </>
               )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Subcategory drill sheet — level 2 */}
+      {detailBudget && drillSubcat && (
+        <>
+          <div className="sheet-overlay" onClick={() => setDrillSubcat(null)} />
+          <div className="sheet">
+            <div className="sheet-handle" />
+            <div className="sheet-header">
+              <button className="btn btn-ghost" onClick={() => setDrillSubcat(null)}>‹ Back</button>
+              <span className="sheet-title">{drillSubcat}</span>
+              <span style={{ width: 40 }} />
+            </div>
+            <div className="sheet-body">
+              <div className="detail-drill-summary">
+                <span className="detail-drill-total">{fmt(drillTxs.reduce((a,t)=>a+t.amount,0))}</span>
+                {sec(drillTxs.reduce((a,t)=>a+t.amount,0)) && (
+                  <span className="detail-drill-sec"> · {sec(drillTxs.reduce((a,t)=>a+t.amount,0))}</span>
+                )}
+                <span className="detail-drill-count"> · {drillTxs.length} transaction{drillTxs.length !== 1 ? 's' : ''}</span>
+              </div>
+              {drillTxs.map(tx => (
+                <TransactionItem key={tx.id} tx={tx} categories={categories}
+                  onClick={t => { setDetailBudget(null); setDrillSubcat(null); setEditTx(t) }} />
+              ))}
             </div>
           </div>
         </>
