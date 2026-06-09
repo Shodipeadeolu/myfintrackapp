@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
-import { useAppUpdate } from '../hooks/useAppUpdate'
+import { useAppUpdate, APP_NAME, APP_FULL } from '../hooks/useAppUpdate'
 import CategoryManager from '../components/CategoryManager'
 import HouseholdManager from '../components/HouseholdManager'
 import ImportSheet from '../components/ImportSheet'
@@ -16,79 +16,25 @@ const CURRENCY_NAMES = {
   AUD:'Australian Dollar', JPY:'Japanese Yen', CNY:'Chinese Yuan',
   INR:'Indian Rupee', BRL:'Brazilian Real', SGD:'Singapore Dollar',
 }
-
-const SYMS = {
-  NGN:'₦', USD:'$', EUR:'€', GBP:'£', GHS:'₵', KES:'KSh', ZAR:'R',
-  AED:'AED', SAR:'SAR', CAD:'CA$', AUD:'A$', JPY:'¥', CNY:'¥',
-  INR:'₹', BRL:'R$', SGD:'S$', CHF:'CHF',
-}
+const SYMS = { NGN:'₦', USD:'$', EUR:'€', GBP:'£', GHS:'₵', KES:'KSh', ZAR:'R', AED:'AED', SAR:'SAR', CAD:'CA$', AUD:'A$', JPY:'¥', CNY:'¥', INR:'₹', BRL:'R$', SGD:'S$', CHF:'CHF' }
 
 export default function Profile() {
-  const {
-    user, profile, household, userRole, logout, currency,
-    balanceRollover, setBalanceRollover,
-    secEnabled, setSecEnabled, secCurrency, setSecCurrency, secRate, setSecRate,
-  } = useApp()
+  const { user, profile, household, userRole, logout, currency, balanceRollover, setBalanceRollover, secEnabled, setSecEnabled, secCurrency, setSecCurrency, secRate, setSecRate } = useApp()
   const update = useAppUpdate()
   const [activeSheet, setActiveSheet] = useState(null)
 
-  const initials = (profile?.displayName || user?.email || 'U')
-    .split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
-
+  const initials = (profile?.displayName || user?.email || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
   const currencyLabel = CURRENCY_NAMES[currency] || currency
   const secSym = SYMS[secCurrency] || secCurrency
 
   const menuItems = [
-    {
-      id: 'currency',
-      icon: '💱',
-      label: 'Currency',
-      desc: `${currency} · ${currencyLabel}`,
-    },
-    {
-      id: 'sec-currency',
-      icon: '🔁',
-      label: 'Secondary Currency',
-      desc: secEnabled
-        ? `On · ${secCurrency} (${secSym}) @ ${(SYMS[currency]||currency)}${secRate?.toLocaleString?.() ?? secRate} per ${secSym}`
-        : 'Off — show only primary currency',
-    },
-    {
-      id: 'types',
-      icon: '⊞',
-      label: 'Transaction Types',
-      desc: 'Manage categories & subcategories',
-    },
-    {
-      id: 'household',
-      icon: '🏠',
-      label: 'Household',
-      desc: household ? household.name : 'Create or join a household',
-    },
-    {
-      id: 'import',
-      icon: '📥',
-      label: 'Import Transactions',
-      desc: 'Upload an XLSX file',
-    },
-    {
-      id: 'rollover',
-      icon: '🔄',
-      label: 'Balance Rollover',
-      desc: balanceRollover ? 'On — closing balance carries forward' : 'Off — each month starts fresh',
-      toggle: true,
-      toggleValue: balanceRollover,
-      onToggle: () => setBalanceRollover(!balanceRollover),
-    },
-    {
-      id: 'update',
-      icon: '🔃',
-      label: 'App Update',
-      desc: update.updateAvailable
-        ? '🟢 Update available!'
-        : `v${update.version} · Last checked ${update.lastChecked}`,
-      badge: update.updateAvailable,
-    },
+    { id: 'currency',     icon: '💱', label: 'Currency',             desc: `${currency} · ${currencyLabel}` },
+    { id: 'sec-currency', icon: '🔁', label: 'Secondary Currency',    desc: secEnabled ? `On · ${secCurrency} (${secSym})` : 'Off — show only primary currency' },
+    { id: 'types',        icon: '⊞', label: 'Transaction Types',     desc: 'Manage categories & subcategories' },
+    { id: 'household',    icon: '🏠', label: 'Household',             desc: household ? household.name : 'Create or join a household' },
+    { id: 'import',       icon: '📥', label: 'Import Transactions',   desc: 'Upload an XLSX file' },
+    { id: 'rollover',     icon: '🔄', label: 'Balance Rollover',      desc: balanceRollover ? 'On — closing balance carries forward' : 'Off — each month starts fresh', toggle: true, toggleValue: balanceRollover, onToggle: () => setBalanceRollover(!balanceRollover) },
+    { id: 'update',       icon: '🔃', label: 'App Update',            desc: update.updateAvailable ? '🟢 Update available!' : `v${update.version} · Last checked ${update.lastChecked}`, badge: update.updateAvailable },
   ]
 
   return (
@@ -99,11 +45,7 @@ export default function Profile() {
           <div className="profile-info">
             <div className="profile-name">{profile?.displayName || 'You'}</div>
             <div className="profile-email">{user?.email}</div>
-            {household && (
-              <div className="profile-badge">
-                {userRole === 'owner' ? '👑 Owner' : `🏠 ${userRole}`}
-              </div>
-            )}
+            {household && <div className="profile-badge">{userRole === 'owner' ? '👑 Owner' : `🏠 ${userRole}`}</div>}
           </div>
         </div>
 
@@ -116,10 +58,7 @@ export default function Profile() {
                   <div className="menu-label">{item.label}</div>
                   <div className="menu-desc">{item.desc}</div>
                 </div>
-                <button
-                  className={`profile-toggle ${item.toggleValue ? 'on' : 'off'}`}
-                  onClick={item.onToggle}
-                >
+                <button className={`profile-toggle ${item.toggleValue ? 'on' : 'off'}`} onClick={item.onToggle}>
                   <div className="profile-toggle-knob" />
                 </button>
               </div>
@@ -128,9 +67,7 @@ export default function Profile() {
                 <div className="menu-icon-wrap">{item.icon}</div>
                 <div className="menu-text">
                   <div className="menu-label">{item.label}</div>
-                  <div className={`menu-desc ${item.badge ? 'menu-desc-accent' : ''}`}>
-                    {item.desc}
-                  </div>
+                  <div className={`menu-desc ${item.badge ? 'menu-desc-accent' : ''}`}>{item.desc}</div>
                 </div>
                 <span className="menu-arrow">›</span>
               </button>
@@ -141,15 +78,13 @@ export default function Profile() {
         <div className="menu-section">
           <button className="menu-row danger-row" onClick={logout}>
             <div className="menu-icon-wrap">🚪</div>
-            <div className="menu-text">
-              <div className="menu-label">Sign Out</div>
-            </div>
+            <div className="menu-text"><div className="menu-label">Sign Out</div></div>
           </button>
         </div>
 
         <div className="profile-footer">
-          <p>FinTrack · Built with ♥</p>
-          <p>v{update.version}</p>
+          <p>{APP_NAME} · {APP_FULL}</p>
+          <p>Built with ♥ · v{update.version}</p>
         </div>
       </div>
 
@@ -158,18 +93,7 @@ export default function Profile() {
       {activeSheet === 'household'    && <HouseholdManager onClose={() => setActiveSheet(null)} />}
       {activeSheet === 'import'       && <ImportSheet onClose={() => setActiveSheet(null)} />}
       {activeSheet === 'update'       && <AppUpdateSheet onClose={() => setActiveSheet(null)} update={update} />}
-      {activeSheet === 'sec-currency' && (
-        <SecondaryCurrencySheet
-          onClose={() => setActiveSheet(null)}
-          secEnabled={secEnabled}
-          toggleSec={setSecEnabled}
-          secCurrency={secCurrency}
-          setSecCurrency={setSecCurrency}
-          secRate={secRate}
-          setSecRate={setSecRate}
-          primaryCurrency={currency}
-        />
-      )}
+      {activeSheet === 'sec-currency' && <SecondaryCurrencySheet onClose={() => setActiveSheet(null)} secEnabled={secEnabled} toggleSec={setSecEnabled} secCurrency={secCurrency} setSecCurrency={setSecCurrency} secRate={secRate} setSecRate={setSecRate} primaryCurrency={currency} />}
     </div>
   )
 }
