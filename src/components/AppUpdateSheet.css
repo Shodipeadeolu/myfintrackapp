@@ -1,149 +1,25 @@
-/* Version card */
-.update-version-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 28px 20px 20px;
-  gap: 6px;
-}
-
-.update-app-icon {
-  font-size: 52px;
-  margin-bottom: 4px;
-}
-
-.update-app-name {
-  font-size: 20px;
-  font-weight: 800;
-  color: var(--text-primary);
-}
-
-.update-version-badge {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-  background: var(--bg-elevated);
-  padding: 3px 10px;
-  border-radius: 20px;
-  margin-bottom: 4px;
-}
-
-.update-status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  margin-top: 4px;
-}
+.update-version-card { display: flex; flex-direction: column; align-items: center; padding: 28px 20px 20px; gap: 4px; }
+.update-app-icon     { font-size: 52px; margin-bottom: 4px; }
+.update-app-name     { font-size: 22px; font-weight: 800; color: var(--text-primary); }
+.update-app-full     { font-size: 13px; color: var(--text-muted); font-weight: 500; margin-bottom: 4px; }
+.update-version-badge{ font-size: 12px; font-weight: 600; color: var(--text-muted); background: var(--bg-elevated); padding: 3px 10px; border-radius: 20px; margin-bottom: 4px; }
+.update-status-dot   { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; }
 .update-status-dot.available { background: var(--green); box-shadow: 0 0 0 3px var(--green-light); }
 .update-status-dot.current   { background: var(--text-muted); }
-
-.update-status-text {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-/* Update available banner */
-.update-banner {
-  margin: 0 0 16px;
-  background: var(--green-light);
-  border: 1.5px solid var(--green);
-  border-radius: var(--radius-md);
-  padding: 14px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.update-banner-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.update-banner-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--green);
-}
-
-.update-banner-desc {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.update-apply-btn {
-  padding: 10px 16px !important;
-  white-space: nowrap;
-  flex-shrink: 0;
-  font-size: 13px !important;
-}
-
-/* Auto-update toggle row */
-.update-setting-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 0;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 12px;
-  gap: 16px;
-}
-
-.update-setting-info { flex: 1; }
-
-.update-setting-label {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.update-setting-desc {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-
-/* Toggle switch */
-.toggle-btn {
-  width: 50px;
-  height: 28px;
-  border-radius: 14px;
-  background: var(--border);
-  position: relative;
-  transition: background 0.25s ease;
-  flex-shrink: 0;
-}
-
-.toggle-btn.on  { background: var(--green); }
-.toggle-btn.off { background: var(--border); }
-
-.toggle-knob {
-  position: absolute;
-  top: 3px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-  transition: left 0.25s ease;
-}
-
+.update-status-text  { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.update-banner { margin: 0 0 16px; background: var(--green-light); border: 1.5px solid var(--green); border-radius: var(--radius-md); padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.update-banner-text  { display: flex; flex-direction: column; gap: 2px; }
+.update-banner-title { font-size: 14px; font-weight: 700; color: var(--green); }
+.update-banner-desc  { font-size: 12px; color: var(--text-secondary); }
+.update-apply-btn    { padding: 10px 16px !important; white-space: nowrap; flex-shrink: 0; font-size: 13px !important; }
+.update-setting-row  { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin-bottom: 12px; gap: 16px; }
+.update-setting-info  { flex: 1; }
+.update-setting-label { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.update-setting-desc  { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.toggle-btn  { width: 50px; height: 28px; border-radius: 14px; background: var(--border); position: relative; transition: background 0.25s ease; flex-shrink: 0; }
+.toggle-btn.on { background: var(--green); }
+.toggle-knob { position: absolute; top: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.2); transition: left 0.25s ease; }
 .toggle-btn.on  .toggle-knob { left: 25px; }
 .toggle-btn.off .toggle-knob { left: 3px; }
-
-/* Last checked */
-.update-last-checked {
-  font-size: 12px;
-  color: var(--text-muted);
-  text-align: center;
-  margin-bottom: 4px;
-}
-
-/* Profile desc accent for update available */
-.menu-desc-accent {
-  color: var(--green) !important;
-  font-weight: 600;
-}
+.update-last-checked { font-size: 12px; color: var(--text-muted); text-align: center; margin-bottom: 4px; }
+.menu-desc-accent { color: var(--green) !important; font-weight: 600; }
