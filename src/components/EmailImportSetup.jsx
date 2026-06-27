@@ -5,7 +5,7 @@ import {
   addPendingImport, markEmailsScanned, getScannedEmailIds,
 } from '../firebase/emailImport'
 import {
-  loadGIS, requestGmailToken, getStoredToken, clearGmailToken,
+  requestGmailToken, getStoredToken, clearGmailToken,
   verifyGmailConnection, fetchEmailsFromSender, fetchEmailContent,
 } from '../utils/gmailService'
 import { parseEmail } from '../utils/emailParser'
@@ -25,7 +25,6 @@ export default function EmailImportSetup({ onClose, onNewImports }) {
   const [newBankEmail, setNewBankEmail] = useState('')
   const [gmailEmail, setGmailEmail] = useState(null)
 
-  useEffect(() => { loadGIS().catch(() => {}) }, [])
   useEffect(() => { if (user) loadConfig() }, [user])
 
   const loadConfig = async () => {
