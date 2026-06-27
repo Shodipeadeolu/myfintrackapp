@@ -2,7 +2,9 @@ const GMAIL_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me'
 const SCOPE = 'https://www.googleapis.com/auth/gmail.metadata'
 
 export async function requestGmailToken(clientId) {
-  const redirectUri = window.location.origin + import.meta.env.BASE_URL
+  const redirectUri = import.meta.env.DEV
+    ? window.location.origin + import.meta.env.BASE_URL
+    : 'https://shodipeadeolu.github.io/myfintrackapp/'
   const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth')
   authUrl.searchParams.set('client_id', clientId)
   authUrl.searchParams.set('redirect_uri', redirectUri)
