@@ -18,17 +18,18 @@ export function parseAmount(text) {
 
 export function parseTransactionType(text) {
   const lower = text.toLowerCase()
-  const debitKeywords = ['debit', 'debited', 'withdrawal', 'pos ', 'purchase', 'charged', 'transfer out', 'sent to']
-  const creditKeywords = ['credit', 'credited', 'deposit', 'received from', 'transfer in', 'inflow', 'reversal', 'refund']
+  const debitKeywords = ['debit', 'debited', 'withdrawal', 'pos ', 'purchase', 'charged', 'transfer out', 'sent to', 'your transfer of']
+  const creditKeywords = ['credit', 'credited', 'deposit', 'received from', 'transfer in', 'inflow', 'reversal', 'refund', 'transfer received']
 
-  if (debitKeywords.some(k => lower.includes(k))) return 'expense'
   if (creditKeywords.some(k => lower.includes(k))) return 'income'
+  if (debitKeywords.some(k => lower.includes(k))) return 'expense'
   return 'expense'
 }
 
 export function parseDescription(snippet, subject) {
   const patterns = [
-    /(?:narration|description|details|merchant|remark)[:\s]+([^\n\r|]{3,80})/i,
+    /(?:narration|description|merchant|remark)[:\s]+([^\n\r|]{3,80})/i,
+    /(?:name|recipient|beneficiary)[:\s]+([A-Z][A-Z\s]{2,50})/i,
     /(?:at |to |from )[:\s]*([A-Z][^\n\r|]{2,50})/
   ]
 
