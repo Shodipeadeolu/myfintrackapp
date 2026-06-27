@@ -184,7 +184,7 @@ export default function EmailImportSetup({ onClose, onNewImports }) {
                 {showAddForm ? (
                   <div className="eis-add-form">
                     <input placeholder="Bank name (e.g. GTBank)" value={newBankName} onChange={e => setNewBankName(e.target.value)} />
-                    <input placeholder="Sender email (e.g. noreply@gtbank.com)" type="email" value={newBankEmail} onChange={e => setNewBankEmail(e.target.value)} />
+                    <input placeholder="Sender email (e.g. noreply@gtbank.com)" value={newBankEmail} onChange={e => setNewBankEmail(e.target.value.replace(/[<>\s]/g, ''))} />
                     <div className="eis-add-form-actions">
                       <button className="eis-form-cancel" onClick={() => { setShowAddForm(false); setNewBankName(''); setNewBankEmail('') }}>Cancel</button>
                       <button className="eis-form-save" onClick={handleAddBank} disabled={!newBankName.trim() || !newBankEmail.trim()}>Add Bank</button>
