@@ -25,7 +25,7 @@ export async function requestGmailToken(clientId) {
   return new Promise((resolve, reject) => {
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
-      scope: 'https://www.googleapis.com/auth/gmail.readonly',
+      scope: 'https://www.googleapis.com/auth/gmail.metadata',
       prompt: 'select_account',
       callback: (resp) => {
         if (resp.error) {
@@ -79,5 +79,5 @@ export async function fetchEmailsFromSender(token, senderEmail, maxResults = 50,
 }
 
 export async function fetchEmailContent(token, messageId) {
-  return gmailFetch(token, `/messages/${messageId}`, { format: 'full' });
+  return gmailFetch(token, `/messages/${messageId}`, { format: 'metadata', metadataHeaders: 'Subject,From,Date' });
 }

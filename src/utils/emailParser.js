@@ -1,42 +1,3 @@
-export function extractEmailBody(payload) {
-  if (!payload) return ''
-
-  function decodeBase64url(data) {
-    return atob(data.replace(/-/g, '+').replace(/_/g, '/'))
-  }
-
-  function stripHtml(html) {
-    return html
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&nbsp;/g, ' ')
-  }
-
-  if (payload.body && payload.body.data) {
-    const decoded = decodeBase64url(payload.body.data)
-    if (payload.mimeType === 'text/plain') return decoded
-    if (payload.mimeType === 'text/html') return stripHtml(decoded)
-  }
-
-  if (payload.parts && payload.parts.length) {
-    let htmlResult = ''
-    for (const part of payload.parts) {
-      const result = extractEmailBody(part)
-      if (result && part.mimeType === 'text/plain') return result
-      if (result && part.mimeType === 'text/html') htmlResult = result
-    }
-    if (htmlResult) return htmlResult
-    for (const part of payload.parts) {
-      const result = extractEmailBody(part)
-      if (result) return result
-    }
-  }
-
-  return ''
-}
-
 export function parseAmount(text) {
   const patterns = [
     /(?:₦|NGN\s*)([0-9,]+\.?\d*)/gi,
@@ -60,22 +21,19 @@ export function parseTransactionType(text) {
   const debitKeywords = ['debit', 'debited', 'withdrawal', 'pos ', 'purchase', 'charged', 'transfer out', 'sent to']
   const creditKeywords = ['credit', 'credited', 'deposit', 'received from', 'transfer in', 'inflow', 'reversal', 'refund']
 
-  const hasDebit = debitKeywords.some(k => lower.includes(k))
-  const hasCredit = creditKeywords.some(k => lower.includes(k))
-
-  if (hasDebit) return 'expense'
-  if (hasCredit) return 'income'
+  if (debitKeywords.some(k => lower.includes(k))) return 'expense'
+  if (creditKeywords.some(k => lower.includes(k))) return 'income'
   return 'expense'
 }
 
-export function parseDescription(body, subject) {
+export function parseDescription(snippet, subject) {
   const patterns = [
     /(?:narration|description|details|merchant|remark)[:\s]+([^\n\r|]{3,80})/i,
     /(?:at |to |from )[:\s]*([A-Z][^\n\r|]{2,50})/
   ]
 
   for (const pattern of patterns) {
-    const match = pattern.exec(body)
+    const match = pattern.exec(snippet)
     if (match && match[1] && match[1].trim().length > 2) {
       return match[1].trim().slice(0, 100)
     }
@@ -84,17 +42,17 @@ export function parseDescription(body, subject) {
   return (subject || 'Bank transaction').trim().slice(0, 100)
 }
 
-export function parseDate(headers, body) {
+export function parseDate(headers, text) {
   const dateHeader = headers.find(h => h.name === 'Date')
   if (dateHeader) {
     const d = new Date(dateHeader.value)
     if (!isNaN(d.getTime())) return d.toISOString().split('T')[0]
   }
 
-  const isoMatch = /(\d{4}-\d{2}-\d{2})/.exec(body)
+  const isoMatch = /(\d{4}-\d{2}-\d{2})/.exec(text)
   if (isoMatch) return isoMatch[1]
 
-  const slashMatch = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/.exec(body)
+  const slashMatch = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/.exec(text)
   if (slashMatch) {
     const d = new Date(slashMatch[1])
     if (!isNaN(d.getTime())) return d.toISOString().split('T')[0]
@@ -126,16 +84,17 @@ export function suggestCategory(text, categories) {
   return expenseCategories[0]?.name || ''
 }
 
+// Uses gmail.metadata scope: parses from subject + snippet (~200 chars)
 export function parseEmail(message, categories) {
   const headers = message.payload?.headers || []
   const subject = headers.find(h => h.name === 'Subject')?.value || ''
-  const body = extractEmailBody(message.payload)
-  const fullText = subject + '\n' + body
+  const snippet = message.snippet || ''
+  const fullText = subject + '\n' + snippet
 
   const amount = parseAmount(fullText)
   const type = parseTransactionType(fullText)
-  const description = parseDescription(body, subject)
-  const date = parseDate(headers, body)
+  const description = parseDescription(snippet, subject)
+  const date = parseDate(headers, snippet)
   const category = suggestCategory(fullText, categories)
 
   return {
@@ -145,7 +104,7 @@ export function parseEmail(message, categories) {
     date,
     category,
     subject,
-    rawBody: body.slice(0, 500),
+    rawBody: snippet,
     confidence: amount ? 'high' : 'low'
   }
 }
