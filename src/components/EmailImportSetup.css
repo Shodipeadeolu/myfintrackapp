@@ -1,4 +1,4 @@
-.eis-section { margin-bottom: 20px; }
+.eis-section { margin-bottom: 24px; }
 .eis-section-title {
   font-size: 11px;
   font-weight: 700;
@@ -8,47 +8,40 @@
   margin-bottom: 10px;
 }
 
-.eis-connect-card {
+/* ── Import code ─────────────────────────────────────────── */
+.eis-code-card {
   background: var(--bg-elevated);
   border-radius: var(--radius-md);
-  padding: 16px;
+  padding: 14px 16px;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
-.eis-connect-icon { font-size: 28px; flex-shrink: 0; }
-.eis-connect-info { flex: 1; min-width: 0; }
-.eis-connect-status {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
+.eis-code {
+  flex: 1;
+  font-family: 'Courier New', monospace;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  color: var(--accent);
+  word-break: break-all;
 }
-.eis-connect-email {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.eis-connect-btn {
+.eis-copy-btn {
   background: var(--accent);
   color: #fff;
   border: none;
-  border-radius: 20px;
-  padding: 8px 16px;
-  font-size: 13px;
+  border-radius: 16px;
+  padding: 6px 14px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
+  transition: background .15s;
 }
-.eis-connect-btn:disabled { opacity: .6; }
-.eis-connect-btn.disconnect {
-  background: var(--bg-elevated2);
-  color: var(--text-secondary);
-}
+.eis-copy-btn:hover { background: var(--accent-dark, #0052cc); }
 
+/* ── Bank list ───────────────────────────────────────────── */
 .eis-bank-list { display: flex; flex-direction: column; gap: 8px; }
 .eis-bank-row {
   background: var(--bg-elevated);
@@ -102,6 +95,7 @@
   font-size: 14px;
   color: var(--text-primary);
   width: 100%;
+  box-sizing: border-box;
   font-family: var(--font);
 }
 .eis-add-form input::placeholder { color: var(--text-muted); }
@@ -112,48 +106,69 @@
 .eis-form-save { background: var(--accent); color: #fff; }
 .eis-form-save:disabled { opacity: .5; }
 
-.eis-scan-card {
+/* ── Script block ────────────────────────────────────────── */
+.eis-script-card {
   background: var(--bg-elevated);
   border-radius: var(--radius-md);
-  padding: 16px;
+  overflow: hidden;
 }
-.eis-scan-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.eis-scan-info { flex: 1; }
-.eis-scan-label { font-size: 14px; font-weight: 600; color: var(--text-primary); }
-.eis-scan-meta { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
-.eis-scan-btn {
-  background: var(--green);
-  color: #fff;
-  border: none;
-  border-radius: 20px;
-  padding: 9px 18px;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
+.eis-script-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-}
-.eis-scan-btn:disabled { opacity: .5; }
-
-.eis-result-bar {
-  margin-top: 12px;
+  justify-content: space-between;
   padding: 10px 14px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 500;
+  border-bottom: 1px solid var(--border);
 }
-.eis-result-bar.success { background: var(--green-light); color: var(--green); }
-.eis-result-bar.info    { background: var(--blue-light);  color: var(--blue);  }
-.eis-result-bar.error   { background: var(--red-light);   color: var(--red);   }
-
-.eis-setup-note {
-  background: var(--amber-light);
-  border-radius: var(--radius-sm);
-  padding: 12px 14px;
+.eis-script-label {
   font-size: 12px;
-  color: var(--amber);
-  line-height: 1.5;
+  font-weight: 600;
+  color: var(--text-secondary);
 }
-.eis-setup-note a { color: var(--amber); }
+.eis-script-body {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  padding: 14px;
+  margin: 0;
+  overflow-x: auto;
+  white-space: pre;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+/* ── Step list ───────────────────────────────────────────── */
+.eis-steps { display: flex; flex-direction: column; gap: 10px; }
+.eis-step-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.eis-step-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.eis-step-text {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  flex: 1;
+}
+
+/* ── Hint ────────────────────────────────────────────────── */
+.eis-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-top: 8px;
+}

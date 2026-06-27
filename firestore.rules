@@ -62,6 +62,20 @@ service cloud.firestore {
       );
     }
 
+    // ── Email Import Config ───────────────────────────────────
+    match /emailImportConfig/{userId} {
+      allow read, write: if isSignedIn() && isOwner(userId);
+    }
+
+    // ── Pending Imports (written by Cloud Function via admin SDK) ──
+    match /pendingImports/{importId} {
+      allow read, update, delete: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        (resource.data.householdId != null && isHouseholdMember(resource.data.householdId))
+      );
+      // Cloud Function writes with admin SDK (bypasses rules) — no client create needed
+    }
+
     // ── Invites ───────────────────────────────────────────────
     match /invites/{inviteId} {
       allow read: if isSignedIn() && (

@@ -1,69 +1,84 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import {
-  getEmailImportConfig, saveEmailImportConfig,
-  addPendingImport, markEmailsScanned, getScannedEmailIds,
+  getEmailImportConfig, saveEmailImportConfig, getOrCreateImportCode,
 } from '../firebase/emailImport'
-import {
-  requestGmailToken, getStoredToken, clearGmailToken,
-  verifyGmailConnection, fetchEmailsFromSender, fetchEmailContent,
-} from '../utils/gmailService'
-import { parseEmail } from '../utils/emailParser'
 import './EmailImportSetup.css'
 
-const CLIENT_ID = import.meta.env.VITE_GMAIL_CLIENT_ID
+const FUNCTION_URL = 'https://us-central1-myfintrack-44d97.cloudfunctions.net/emailImport'
+
+function buildScript(importCode, banks) {
+  const senders = banks.length
+    ? banks.map(b => `'${b.email}'`).join(',\n  ')
+    : "'no-reply@your-bank.com'"
+  return `// ═══════════════════════════════════════════════
+// HHFinance Auto-Import Script
+// Runs every 5 min and sends bank emails to your app
+// ═══════════════════════════════════════════════
+
+var USER_CODE   = '${importCode}'
+var WEBHOOK_URL = '${FUNCTION_URL}'
+var SENDERS     = [
+  ${senders}
+]
+
+function importBankEmails() {
+  var props     = PropertiesService.getUserProperties()
+  var processed = new Set(JSON.parse(props.getProperty('hhf_done') || '[]'))
+  var newIds    = []
+  var query     = 'from:(' + SENDERS.join(' OR ') + ')'
+
+  GmailApp.search(query, 0, 100).forEach(function(thread) {
+    thread.getMessages().forEach(function(msg) {
+      var id = msg.getId()
+      if (processed.has(id)) return
+      try {
+        UrlFetchApp.fetch(WEBHOOK_URL, {
+          method: 'post',
+          contentType: 'application/json',
+          payload: JSON.stringify({
+            userCode: USER_CODE,
+            subject:  msg.getSubject(),
+            body:     msg.getPlainBody().substring(0, 600),
+            date:     msg.getDate().toISOString(),
+            from:     msg.getFrom()
+          }),
+          muteHttpExceptions: true
+        })
+        newIds.push(id)
+      } catch(e) { Logger.log(e) }
+    })
+  })
+
+  if (newIds.length) {
+    var all = Array.from(processed).concat(newIds)
+    props.setProperty('hhf_done', JSON.stringify(all.slice(-500)))
+  }
+}`
+}
 
 export default function EmailImportSetup({ onClose, onNewImports }) {
-  const { user, householdId, categories } = useApp()
-  const [config, setConfig]         = useState(null)
-  const [loading, setLoading]       = useState(true)
-  const [connecting, setConnecting] = useState(false)
-  const [scanning, setScanning]     = useState(false)
-  const [scanResult, setScanResult] = useState(null)
+  const { user, householdId } = useApp()
+  const [config, setConfig]       = useState(null)
+  const [importCode, setImportCode] = useState('')
+  const [loading, setLoading]     = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
   const [newBankName, setNewBankName] = useState('')
   const [newBankEmail, setNewBankEmail] = useState('')
-  const [gmailEmail, setGmailEmail] = useState(null)
+  const [copied, setCopied]       = useState('')
 
   useEffect(() => { if (user) loadConfig() }, [user])
 
   const loadConfig = async () => {
     setLoading(true)
     try {
-      const cfg = await getEmailImportConfig(user.uid) || { banks: [], connected: false }
+      const [cfg, code] = await Promise.all([
+        getEmailImportConfig(user.uid).then(c => c || { banks: [] }),
+        getOrCreateImportCode(user.uid),
+      ])
       setConfig(cfg)
-      const token = getStoredToken()
-      if (token && cfg.connected) {
-        try { setGmailEmail(await verifyGmailConnection(token)) } catch {}
-      }
+      setImportCode(code)
     } finally { setLoading(false) }
-  }
-
-  const handleConnect = async () => {
-    if (!CLIENT_ID) return
-    setConnecting(true); setScanResult(null)
-    try {
-      const token = await requestGmailToken(CLIENT_ID)
-      const email = await verifyGmailConnection(token)
-      setGmailEmail(email)
-      const updated = { ...config, connected: true, connectedEmail: email }
-      await saveEmailImportConfig(user.uid, updated)
-      setConfig(updated)
-    } catch (err) {
-      const msg = err?.message || ''
-      const isPopup = msg.includes('popup') || msg.includes('blocked') || msg.includes('disallowed')
-      setScanResult({ error: isPopup
-        ? 'Popup was blocked. Click the address bar icon to allow popups for this site, then try again.'
-        : `Could not connect to Gmail (${msg || 'unknown error'}). Make sure popups are allowed.`
-      })
-    } finally { setConnecting(false) }
-  }
-
-  const handleDisconnect = async () => {
-    clearGmailToken(); setGmailEmail(null)
-    const updated = { ...config, connected: false }
-    await saveEmailImportConfig(user.uid, updated)
-    setConfig(updated)
   }
 
   const handleAddBank = async () => {
@@ -82,59 +97,14 @@ export default function EmailImportSetup({ onClose, onNewImports }) {
     setConfig(updated)
   }
 
-  const handleScan = async () => {
-    let token = getStoredToken()
-    if (!token) {
-      try { token = await requestGmailToken(CLIENT_ID) } catch {
-        setScanResult({ error: 'Gmail reconnect required — tap Connect above.' }); return
-      }
-    }
-    if (!config?.banks?.length) {
-      setScanResult({ error: 'Add at least one bank email address first.' }); return
-    }
-    setScanning(true); setScanResult(null)
-    try {
-      const scannedIds = await getScannedEmailIds(user.uid)
-      const seen = new Set(scannedIds)
-      const lastScanEpoch = config.lastScanAt ? new Date(config.lastScanAt).getTime() : null
-      let totalNew = 0
-      const newIds = []
-
-      for (const bank of config.banks) {
-        const msgs = await fetchEmailsFromSender(token, bank.email, 50, lastScanEpoch)
-        const fresh = msgs.filter(m => !seen.has(m.id))
-        for (const msg of fresh.slice(0, 30)) {
-          try {
-            const full = await fetchEmailContent(token, msg.id)
-            const parsed = parseEmail(full, categories)
-            if (parsed.amount) {
-              await addPendingImport(user.uid, householdId, { bankName: bank.name, emailId: msg.id, ...parsed })
-              totalNew++
-            }
-            newIds.push(msg.id)
-          } catch {}
-        }
-      }
-
-      if (newIds.length) await markEmailsScanned(user.uid, newIds)
-      const now = new Date().toISOString()
-      await saveEmailImportConfig(user.uid, { ...config, lastScanAt: now })
-      setConfig(c => ({ ...c, lastScanAt: now }))
-      setScanResult({ count: totalNew })
-      if (totalNew > 0 && onNewImports) onNewImports(totalNew)
-    } catch (e) {
-      if (e.message === 'TOKEN_EXPIRED') {
-        clearGmailToken(); setGmailEmail(null)
-        setScanResult({ error: 'Session expired — tap Connect to reconnect Gmail.' })
-      } else {
-        setScanResult({ error: 'Scan failed. Check your internet connection.' })
-      }
-    } finally { setScanning(false) }
+  const copyText = (text, key) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key)
+      setTimeout(() => setCopied(''), 2000)
+    })
   }
 
-  const lastScanLabel = config?.lastScanAt
-    ? new Date(config.lastScanAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-    : 'Never'
+  const script = importCode ? buildScript(importCode, config?.banks || []) : ''
 
   return (
     <>
@@ -149,33 +119,21 @@ export default function EmailImportSetup({ onClose, onNewImports }) {
         <div className="sheet-body">
           {loading ? <div className="load-row"><span className="spinner" /></div> : (<>
 
-            {!CLIENT_ID && (
-              <div className="eis-setup-note" style={{ marginBottom: 20 }}>
-                ⚙️ <strong>Setup required:</strong> Ask your developer to add <code>VITE_GMAIL_CLIENT_ID</code> to the app environment. See Google Cloud Console → APIs &amp; Services → Credentials.
-              </div>
-            )}
-
+            {/* Step 1 — Import code */}
             <div className="eis-section">
-              <div className="eis-section-title">Gmail Connection</div>
-              <div className="eis-connect-card">
-                <div className="eis-connect-icon">📧</div>
-                <div className="eis-connect-info">
-                  <div className="eis-connect-status">{gmailEmail ? 'Connected' : 'Not connected'}</div>
-                  {gmailEmail && <div className="eis-connect-email">{gmailEmail}</div>}
-                  {!gmailEmail && <div className="eis-connect-email">Grant read-only access to your inbox</div>}
-                </div>
-                {gmailEmail ? (
-                  <button className="eis-connect-btn disconnect" onClick={handleDisconnect}>Disconnect</button>
-                ) : (
-                  <button className="eis-connect-btn" onClick={handleConnect} disabled={connecting || !CLIENT_ID}>
-                    {connecting ? <span className="spinner" style={{ width: 14, height: 14 }} /> : 'Connect'}
-                  </button>
-                )}
+              <div className="eis-section-title">Step 1 — Your Import Code</div>
+              <div className="eis-code-card">
+                <span className="eis-code">{importCode}</span>
+                <button className="eis-copy-btn" onClick={() => copyText(importCode, 'code')}>
+                  {copied === 'code' ? '✓ Copied' : 'Copy'}
+                </button>
               </div>
+              <div className="eis-hint">This code links your Gmail script to your account. Keep it private.</div>
             </div>
 
+            {/* Step 2 — Bank senders */}
             <div className="eis-section">
-              <div className="eis-section-title">Bank Notification Emails</div>
+              <div className="eis-section-title">Step 2 — Add Your Bank Emails</div>
               <div className="eis-bank-list">
                 {(config?.banks || []).map((bank, idx) => (
                   <div key={idx} className="eis-bank-row">
@@ -188,11 +146,14 @@ export default function EmailImportSetup({ onClose, onNewImports }) {
                 ))}
                 {showAddForm ? (
                   <div className="eis-add-form">
-                    <input placeholder="Bank name (e.g. GTBank)" value={newBankName} onChange={e => setNewBankName(e.target.value)} />
-                    <input placeholder="Sender email (e.g. noreply@gtbank.com)" value={newBankEmail} onChange={e => setNewBankEmail(e.target.value.replace(/[<>\s]/g, ''))} />
+                    <input placeholder="Bank name (e.g. Opay)" value={newBankName}
+                      onChange={e => setNewBankName(e.target.value)} />
+                    <input placeholder="Sender email (e.g. no-reply@opay-nigeria.com)" value={newBankEmail}
+                      onChange={e => setNewBankEmail(e.target.value.replace(/[<>\s]/g, ''))} />
                     <div className="eis-add-form-actions">
                       <button className="eis-form-cancel" onClick={() => { setShowAddForm(false); setNewBankName(''); setNewBankEmail('') }}>Cancel</button>
-                      <button className="eis-form-save" onClick={handleAddBank} disabled={!newBankName.trim() || !newBankEmail.trim()}>Add Bank</button>
+                      <button className="eis-form-save" onClick={handleAddBank}
+                        disabled={!newBankName.trim() || !newBankEmail.trim()}>Add Bank</button>
                     </div>
                   </div>
                 ) : (
@@ -201,28 +162,40 @@ export default function EmailImportSetup({ onClose, onNewImports }) {
               </div>
             </div>
 
+            {/* Step 3 — Script */}
             <div className="eis-section">
-              <div className="eis-section-title">Scan</div>
-              <div className="eis-scan-card">
-                <div className="eis-scan-row">
-                  <div className="eis-scan-info">
-                    <div className="eis-scan-label">Scan for new transactions</div>
-                    <div className="eis-scan-meta">Last scan: {lastScanLabel}</div>
-                  </div>
-                  <button className="eis-scan-btn" onClick={handleScan}
-                    disabled={scanning || !gmailEmail || !(config?.banks?.length)}>
-                    {scanning
-                      ? <><span className="spinner" style={{ width: 14, height: 14 }} /> Scanning…</>
-                      : '⚡ Scan now'}
+              <div className="eis-section-title">Step 3 — Copy Your Script</div>
+              <div className="eis-script-card">
+                <div className="eis-script-header">
+                  <span className="eis-script-label">Auto-generated script</span>
+                  <button className="eis-copy-btn" onClick={() => copyText(script, 'script')}>
+                    {copied === 'script' ? '✓ Copied!' : 'Copy Script'}
                   </button>
                 </div>
-                {scanResult && (
-                  <div className={`eis-result-bar ${scanResult.error ? 'error' : scanResult.count > 0 ? 'success' : 'info'}`}>
-                    {scanResult.error || (scanResult.count > 0
-                      ? `✓ ${scanResult.count} new transaction${scanResult.count !== 1 ? 's' : ''} queued for review`
-                      : 'No new transactions found since last scan.')}
+                <pre className="eis-script-body">{script}</pre>
+              </div>
+            </div>
+
+            {/* Step 4 — Instructions */}
+            <div className="eis-section">
+              <div className="eis-section-title">Step 4 — Set Up in Google</div>
+              <div className="eis-steps">
+                {[
+                  { n: 1, text: 'Go to script.google.com and sign in with your Gmail account' },
+                  { n: 2, text: 'Click "+ New project"' },
+                  { n: 3, text: 'Delete all default code, then paste the copied script' },
+                  { n: 4, text: 'Click Save (Ctrl+S), rename to "HHFinance Import" when asked' },
+                  { n: 5, text: 'Click Run → select "importBankEmails" → grant Gmail permission when prompted' },
+                  { n: 6, text: 'Click the clock icon (Triggers) on the left → Add Trigger → set Timer to "Every 5 minutes" → Save' },
+                ].map(({ n, text }) => (
+                  <div key={n} className="eis-step-row">
+                    <div className="eis-step-num">{n}</div>
+                    <div className="eis-step-text">{text}</div>
                   </div>
-                )}
+                ))}
+              </div>
+              <div className="eis-hint" style={{ marginTop: 12 }}>
+                After setup, bank emails will automatically appear in your Pending Imports within 5 minutes.
               </div>
             </div>
 

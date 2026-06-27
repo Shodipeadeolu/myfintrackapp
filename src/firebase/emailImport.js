@@ -1,6 +1,17 @@
 import { db } from './config'
 import { doc, getDoc, setDoc, collection, addDoc, query, where, getDocs, updateDoc, serverTimestamp, orderBy, limit } from 'firebase/firestore'
 
+export async function getOrCreateImportCode(userId) {
+  const ref = doc(db, 'emailImportConfig', userId)
+  const snap = await getDoc(ref)
+  if (snap.exists() && snap.data().importCode) return snap.data().importCode
+  const code = Array.from({ length: 20 }, () =>
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.floor(Math.random() * 36)]
+  ).join('')
+  await setDoc(ref, { importCode: code }, { merge: true })
+  return code
+}
+
 export async function getEmailImportConfig(userId) {
   const ref = doc(db, 'emailImportConfig', userId)
   const snap = await getDoc(ref)
