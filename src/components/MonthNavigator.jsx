@@ -2,7 +2,7 @@ import { addMonths, subMonths } from 'date-fns'
 import { fmtMonthYear } from '../utils/helpers'
 import './MonthNavigator.css'
 
-export default function MonthNavigator({ date, onChange }) {
+export default function MonthNavigator({ date, onChange, allowFuture = false }) {
   return (
     <div className="month-nav">
       <button className="month-btn" onClick={() => onChange(subMonths(date, 1))}>‹</button>
@@ -10,7 +10,7 @@ export default function MonthNavigator({ date, onChange }) {
       <button
         className="month-btn"
         onClick={() => onChange(addMonths(date, 1))}
-        disabled={addMonths(date, 1) > new Date()}
+        disabled={!allowFuture && addMonths(date, 1) > new Date()}
       >›</button>
     </div>
   )

@@ -5,11 +5,13 @@ import {
   getUserProfile, setUserProfile, getHousehold,
   getCategories, addCategory
 } from '../firebase/service'
+import { useAppUpdate } from '../hooks/useAppUpdate'
 
 const AppContext = createContext(null)
 export const useApp = () => useContext(AppContext)
 
 export function AppProvider({ children }) {
+  const appUpdate = useAppUpdate()
   const [user, setUser]                     = useState(null)
   const [profile, setProfile]               = useState(null)
   const [household, setHousehold]           = useState(null)
@@ -153,6 +155,7 @@ export function AppProvider({ children }) {
       secRate, setSecRate, convertToSec,
       reloadTrigger: reloadCounter, triggerReload,
       refreshCategories, logout,
+      appUpdate,
     }}>
       {children}
     </AppContext.Provider>

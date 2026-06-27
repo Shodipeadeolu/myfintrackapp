@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useApp } from './context/AppContext'
 import BottomNav from './components/BottomNav'
 import FAB from './components/FAB'
@@ -13,8 +13,18 @@ import './styles/global.css'
 import './App.css'
 
 export default function App() {
-  const { user, authLoading, triggerReload } = useApp()
+  const { user, authLoading, triggerReload, appUpdate } = useApp()
+  const { updateAvailable, applyUpdate } = appUpdate
   const [tab, setTab] = useState('home')
+
+  // Strip the cache-busting param left by forceReload() in useAppUpdate
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (url.searchParams.has('_v')) {
+      url.searchParams.delete('_v')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [])
   const [profileTab, setProfileTab] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
   const [addKey, setAddKey] = useState(0)
@@ -66,6 +76,12 @@ export default function App() {
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
+      {updateAvailable && (
+        <div className="update-banner-global">
+          <span className="update-banner-global-text">⚡ New version available</span>
+          <button className="update-banner-global-btn" onClick={applyUpdate}>Refresh now</button>
+        </div>
+      )}
       <div className="page-container">
         {tab === 'home'         && <Home onNavigate={navigate} />}
         {tab === 'transactions' && <Transactions />}

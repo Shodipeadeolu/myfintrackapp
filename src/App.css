@@ -1,3 +1,30 @@
+.update-banner-global {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #e8421a;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 9999;
+  flex-shrink: 0;
+}
+.update-banner-global-text { flex: 1; }
+.update-banner-global-btn {
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.4);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.update-banner-global-btn:active { opacity: 0.8; }
+
 .app-root {
   display: flex;
   flex-direction: column;

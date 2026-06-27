@@ -37,9 +37,10 @@ export default function Budgets() {
 
   const monthKey = format(month, 'yyyy-MM')
 
-  useEffect(() => { load() }, [month, householdId, reloadTrigger])
+  useEffect(() => { if (user) load() }, [user, month, householdId, reloadTrigger])
 
   const load = async () => {
+    if (!user) return
     setLoading(true)
     try {
       const [buds, ovs, txs] = await Promise.all([
@@ -116,7 +117,7 @@ export default function Budgets() {
     <div className="screen">
       <div className="budgets-header">
         <h2 className="page-title">Budget Overview</h2>
-        <MonthNavigator date={month} onChange={setMonth} />
+        <MonthNavigator date={month} onChange={setMonth} allowFuture />
       </div>
       <div className="budgets-subtitle">Track and manage your monthly budgets</div>
 
@@ -450,7 +451,7 @@ function MonthOverrideSheet({ budget, month, monthKey, currentOverride, currency
           </div>
 
           <div className="field">
-            <label>Budget for {format(month,'MMMM only')}</label>
+            <label>Budget for {format(month,'MMMM')}</label>
             <div className="amount-field">
               <span className="currency-sym">{sym}</span>
               <input type="text" inputMode="decimal" placeholder="0.00"

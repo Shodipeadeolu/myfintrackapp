@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
-import { useAppUpdate, APP_NAME, APP_FULL } from '../hooks/useAppUpdate'
+import { APP_NAME, APP_FULL } from '../hooks/useAppUpdate'
 import CategoryManager from '../components/CategoryManager'
 import HouseholdManager from '../components/HouseholdManager'
 import ImportSheet from '../components/ImportSheet'
@@ -19,8 +19,7 @@ const CURRENCY_NAMES = {
 const SYMS = { NGN:'₦', USD:'$', EUR:'€', GBP:'£', GHS:'₵', KES:'KSh', ZAR:'R', AED:'AED', SAR:'SAR', CAD:'CA$', AUD:'A$', JPY:'¥', CNY:'¥', INR:'₹', BRL:'R$', SGD:'S$', CHF:'CHF' }
 
 export default function Profile() {
-  const { user, profile, household, userRole, logout, currency, balanceRollover, setBalanceRollover, secEnabled, setSecEnabled, secCurrency, setSecCurrency, secRate, setSecRate } = useApp()
-  const update = useAppUpdate()
+  const { user, profile, household, userRole, logout, currency, balanceRollover, setBalanceRollover, secEnabled, setSecEnabled, secCurrency, setSecCurrency, secRate, setSecRate, appUpdate: update } = useApp()
   const [activeSheet, setActiveSheet] = useState(null)
 
   const initials = (profile?.displayName || user?.email || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
