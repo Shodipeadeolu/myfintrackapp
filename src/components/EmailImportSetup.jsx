@@ -5,7 +5,7 @@ import {
   addPendingImport, markEmailsScanned, getScannedEmailIds,
 } from '../firebase/emailImport'
 import {
-  requestGmailToken, getStoredToken, clearGmailToken,
+  loadGIS, requestGmailToken, getStoredToken, clearGmailToken,
   verifyGmailConnection, fetchEmailsFromSender, fetchEmailContent,
 } from '../utils/gmailService'
 import { parseEmail } from '../utils/emailParser'
@@ -25,6 +25,7 @@ export default function EmailImportSetup({ onClose, onNewImports }) {
   const [newBankEmail, setNewBankEmail] = useState('')
   const [gmailEmail, setGmailEmail] = useState(null)
 
+  useEffect(() => { loadGIS().catch(() => {}) }, [])
   useEffect(() => { if (user) loadConfig() }, [user])
 
   const loadConfig = async () => {
@@ -49,8 +50,13 @@ export default function EmailImportSetup({ onClose, onNewImports }) {
       const updated = { ...config, connected: true, connectedEmail: email }
       await saveEmailImportConfig(user.uid, updated)
       setConfig(updated)
-    } catch {
-      setScanResult({ error: 'Could not connect to Gmail. Make sure popups are allowed.' })
+    } catch (err) {
+      const msg = err?.message || ''
+      const isPopup = msg.includes('popup') || msg.includes('blocked') || msg.includes('disallowed')
+      setScanResult({ error: isPopup
+        ? 'Popup was blocked. Click the address bar icon to allow popups for this site, then try again.'
+        : `Could not connect to Gmail (${msg || 'unknown error'}). Make sure popups are allowed.`
+      })
     } finally { setConnecting(false) }
   }
 

@@ -2,7 +2,7 @@ const GMAIL_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
 let gisLoadPromise = null;
 
-function loadGIS() {
+export function loadGIS() {
   if (gisLoadPromise) return gisLoadPromise;
   gisLoadPromise = new Promise((resolve, reject) => {
     if (window.google && window.google.accounts && window.google.accounts.oauth2) {
@@ -26,10 +26,10 @@ export async function requestGmailToken(clientId) {
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: 'https://www.googleapis.com/auth/gmail.readonly',
-      prompt: '',
+      prompt: 'select_account',
       callback: (resp) => {
         if (resp.error) {
-          reject(new Error(resp.error_description || resp.error));
+          reject(new Error(resp.error_description || resp.error || 'oauth_error'));
           return;
         }
         const expiry = Date.now() + (resp.expires_in - 60) * 1000;
