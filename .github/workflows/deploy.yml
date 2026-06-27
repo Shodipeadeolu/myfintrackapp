@@ -35,6 +35,8 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          VITE_GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

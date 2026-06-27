@@ -1,3 +1,22 @@
+.home-pending-card {
+  margin: 0 16px 12px;
+  background: var(--amber-light);
+  border: 1.5px solid var(--amber);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: calc(100% - 32px);
+  cursor: pointer;
+  text-align: left;
+}
+.home-pending-icon { font-size: 22px; flex-shrink: 0; }
+.home-pending-text { flex: 1; }
+.home-pending-title { font-size: 14px; font-weight: 700; color: var(--amber); }
+.home-pending-sub   { font-size: 12px; color: var(--amber); opacity: .8; margin-top: 2px; }
+.home-pending-arrow { color: var(--amber); font-size: 20px; }
+
 .home-header {
   display: flex; align-items: flex-start; justify-content: space-between;
   padding: 20px 20px 8px;
