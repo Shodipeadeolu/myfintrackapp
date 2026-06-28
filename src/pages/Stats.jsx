@@ -177,12 +177,13 @@ export default function Stats() {
   const [savingsBalance, setSavingsBalance] = useState(0)
   const [loanBalance, setLoanBalance]       = useState(0)
 
-  useEffect(() => { load() }, [period, anchor, customStart, customEnd, householdId, reloadTrigger])
+  useEffect(() => { if (user) load() }, [user, period, anchor, customStart, customEnd, householdId, reloadTrigger])
 
   // Load real savings/loan balances on mount and whenever sheets close
-  useEffect(() => { loadSavingsLoans() }, [householdId, showSavings, showLoans])
+  useEffect(() => { if (user) loadSavingsLoans() }, [user, householdId, showSavings, showLoans])
 
   const loadSavingsLoans = async () => {
+    if (!user) return
     try {
       const [savAccs, loanAccs] = await Promise.all([
         getSavingsAccounts(user.uid, householdId),
@@ -216,6 +217,7 @@ export default function Stats() {
   }
 
   const load = async () => {
+    if (!user) return
     setLoading(true)
     try {
       const { start, end } = getRange()

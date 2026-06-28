@@ -21,9 +21,10 @@ export default function Transactions() {
   const [search, setSearch]             = useState('')
   const [editTx, setEditTx]             = useState(null)
 
-  useEffect(() => { load() }, [month, householdId, reloadTrigger])
+  useEffect(() => { if (user) load() }, [user, month, householdId, reloadTrigger])
 
   const load = async () => {
+    if (!user) return
     setLoading(true)
     try {
       const txs = await getTransactions(user.uid, householdId,

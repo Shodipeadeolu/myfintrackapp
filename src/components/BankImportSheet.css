@@ -1,0 +1,346 @@
+/* Sheet sizing */
+.bi-sheet { max-height: 96vh; }
+/* .bi-body uses sheet-body's default scroll (flex: 1; overflow-y: auto) */
+
+/* Info block */
+.bi-info {
+  background: var(--blue-light);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+.bi-formats {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+.bi-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: var(--bg-elevated2);
+  border: 1.5px solid var(--border);
+  color: var(--text-primary);
+  letter-spacing: .04em;
+}
+.bi-tip {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px !important;
+}
+.bi-drop { cursor: pointer; width: 100%; }
+
+/* Error */
+.bi-error {
+  background: var(--red-light, #fff0f0);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  font-size: 13px;
+  color: var(--red);
+  font-weight: 500;
+  margin-top: 8px;
+}
+
+/* Summary bar */
+.bi-summary-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.bi-summary-stat {
+  flex: 1;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.bi-summary-num {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.bi-summary-num.bi-green  { color: var(--green); }
+.bi-summary-num.bi-amber  { color: var(--amber); }
+.bi-summary-lbl {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+/* Format badge */
+.bi-format-badge {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+/* Filter row */
+.bi-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.bi-select-all {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.bi-select-all input { cursor: pointer; }
+
+/* Date range filter */
+.bi-date-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.bi-date-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  flex-shrink: 0;
+}
+.bi-date-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+  font-family: var(--font);
+  transition: border-color var(--transition);
+}
+.bi-date-input:focus { border-color: var(--accent); }
+.bi-date-sep {
+  font-size: 13px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.bi-date-clear {
+  padding: 5px 9px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-elevated2);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.bi-filter-count {
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+/* Transaction list */
+.bi-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+/* Review row */
+.bi-row {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--border);
+  overflow: hidden;
+  transition: border-color var(--transition);
+}
+.bi-row-dim { opacity: 0.45; }
+.bi-row-matched { border-color: var(--green-dim); }
+
+.bi-row-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 10px 10px 12px;
+}
+.bi-checkbox { flex-shrink: 0; cursor: pointer; width: 16px; height: 16px; }
+
+.bi-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.bi-dot.expense { background: var(--red); }
+.bi-dot.income  { background: var(--green); }
+
+.bi-row-main {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+.bi-row-merchant {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bi-row-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.bi-row-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.bi-row-amount {
+  font-size: 13px;
+  font-weight: 700;
+}
+.bi-row-amount.expense { color: var(--red); }
+.bi-row-amount.income  { color: var(--green); }
+
+.bi-cat-chip {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+.bi-cat-empty {
+  background: var(--bg-elevated2);
+  color: var(--text-muted);
+}
+.bi-suggested-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--green);
+  flex-shrink: 0;
+}
+
+.bi-chevron {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  flex-shrink: 0;
+}
+
+/* Edit area */
+.bi-edit-area {
+  padding: 0 12px 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bi-field { display: flex; flex-direction: column; gap: 4px; }
+.bi-field-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.bi-field-row { display: flex; gap: 8px; }
+
+.bi-cat-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.bi-cat-btn {
+  padding: 5px 10px;
+  border-radius: 16px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-elevated2);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.bi-cat-btn.active {
+  background: var(--accent-light);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.bi-desc-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+/* Action bar — sticky so it stays visible while scrolling through transactions */
+.bi-action-bar {
+  position: sticky;
+  bottom: -32px; /* offset sheet-body's 32px bottom padding */
+  z-index: 2;
+  display: flex;
+  gap: 8px;
+  padding: 12px 0 16px;
+  margin-left: -20px;
+  margin-right: -20px;
+  padding-left: 20px;
+  padding-right: 20px;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+.bi-change-file {
+  flex-shrink: 0;
+  font-size: 13px;
+}
+.bi-import-btn {
+  flex: 1;
+  font-size: 14px;
+}
+.bi-import-btn:disabled { opacity: .4; }
+
+/* Progress */
+.bi-progress-wrap {
+  padding: 40px 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.bi-progress-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* Done */
+.bi-learn-note {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}

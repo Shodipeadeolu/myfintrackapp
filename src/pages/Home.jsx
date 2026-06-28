@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import { getTransactions } from '../firebase/service'
-import { getPendingImports } from '../firebase/emailImport'
 import { fmtCurrency, fmtCurrencyCompact, toFirestoreDate } from '../utils/helpers'
 import { fmtSec } from '../utils/secCurrency'
 import { calcCashBalance } from '../utils/balanceCalc'
@@ -10,7 +9,6 @@ import MonthNavigator from '../components/MonthNavigator'
 import TransactionItem from '../components/TransactionItem'
 import AddTransaction from '../components/AddTransaction'
 import DailySummary from '../components/DailySummary'
-import PendingImports from '../components/PendingImports'
 import './Home.css'
 
 function firstName(profile, user) {
@@ -33,13 +31,10 @@ export default function Home({ onNavigate }) {
   const [loading, setLoading]           = useState(false)
   const [showAdd, setShowAdd]           = useState(false)
   const [editTx, setEditTx]             = useState(null)
-  const [pendingCount, setPendingCount] = useState(0)
-  const [showPending, setShowPending]   = useState(false)
 
   useEffect(() => {
     if (!user) return
     load()
-    getPendingImports(user.uid, householdId).then(items => setPendingCount(items.length)).catch(() => {})
   }, [user, month, householdId, reloadTrigger])
 
   const load = async () => {
@@ -114,16 +109,6 @@ export default function Home({ onNavigate }) {
           </div>
         </div>
 
-        {pendingCount > 0 && (
-          <button className="home-pending-card" onClick={() => setShowPending(true)}>
-            <span className="home-pending-icon">⏳</span>
-            <div className="home-pending-text">
-              <div className="home-pending-title">{pendingCount} pending import{pendingCount !== 1 ? 's' : ''}</div>
-              <div className="home-pending-sub">Tap to review transactions from your bank emails</div>
-            </div>
-            <span className="home-pending-arrow">›</span>
-          </button>
-        )}
 
         {/* 3 stat cards */}
         <div className="home-stat-cards">
@@ -195,15 +180,6 @@ export default function Home({ onNavigate }) {
         />
       )}
 
-      {showPending && (
-        <PendingImports
-          onClose={() => setShowPending(false)}
-          onAccepted={() => {
-            getPendingImports(user.uid, householdId).then(items => setPendingCount(items.length))
-            load()
-          }}
-        />
-      )}
     </div>
   )
 }

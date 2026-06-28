@@ -4,12 +4,10 @@ import { APP_NAME, APP_FULL } from '../hooks/useAppUpdate'
 import CategoryManager from '../components/CategoryManager'
 import HouseholdManager from '../components/HouseholdManager'
 import ImportSheet from '../components/ImportSheet'
+import BankImportSheet from '../components/BankImportSheet'
 import CurrencyPicker from '../components/CurrencyPicker'
 import AppUpdateSheet from '../components/AppUpdateSheet'
 import SecondaryCurrencySheet from '../components/SecondaryCurrencySheet'
-import EmailImportSetup from '../components/EmailImportSetup'
-import PendingImports from '../components/PendingImports'
-import { getPendingImports } from '../firebase/emailImport'
 import './Profile.css'
 
 const CURRENCY_NAMES = {
@@ -24,12 +22,6 @@ const SYMS = { NGN:'₦', USD:'$', EUR:'€', GBP:'£', GHS:'₵', KES:'KSh', ZA
 export default function Profile() {
   const { user, profile, household, userRole, logout, currency, householdId, balanceRollover, setBalanceRollover, secEnabled, setSecEnabled, secCurrency, setSecCurrency, secRate, setSecRate, appUpdate: update } = useApp()
   const [activeSheet, setActiveSheet] = useState(null)
-  const [pendingCount, setPendingCount] = useState(0)
-
-  useEffect(() => {
-    if (!user) return
-    getPendingImports(user.uid, householdId).then(items => setPendingCount(items.length)).catch(() => {})
-  }, [user, householdId])
 
   const initials = (profile?.displayName || user?.email || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
   const currencyLabel = CURRENCY_NAMES[currency] || currency
@@ -40,9 +32,8 @@ export default function Profile() {
     { id: 'sec-currency', icon: '🔁', label: 'Secondary Currency',    desc: secEnabled ? `On · ${secCurrency} (${secSym})` : 'Off — show only primary currency' },
     { id: 'types',        icon: '⊞', label: 'Transaction Types',     desc: 'Manage categories & subcategories' },
     { id: 'household',    icon: '🏠', label: 'Household',             desc: household ? household.name : 'Create or join a household' },
-    { id: 'import',        icon: '📥', label: 'Import Transactions',   desc: 'Upload an XLSX file' },
-    { id: 'email-import',  icon: '📧', label: 'Email Import',          desc: 'Auto-record from bank notification emails' },
-    { id: 'pending',       icon: '⏳', label: 'Pending Imports',       desc: pendingCount > 0 ? `${pendingCount} transaction${pendingCount !== 1 ? 's' : ''} to review` : 'No pending imports', badge: pendingCount > 0 },
+    { id: 'bank-import',   icon: '🏦', label: 'Import Bank Statement', desc: 'Upload CSV, XLSX or PDF from your bank' },
+    { id: 'import',        icon: '📥', label: 'Import (XLSX Export)',  desc: 'Re-import a FinTrack export file' },
     { id: 'rollover',      icon: '🔄', label: 'Balance Rollover',      desc: balanceRollover ? 'On — closing balance carries forward' : 'Off — each month starts fresh', toggle: true, toggleValue: balanceRollover, onToggle: () => setBalanceRollover(!balanceRollover) },
     { id: 'update',       icon: '🔃', label: 'App Update',            desc: update.updateAvailable ? '🟢 Update available!' : `v${update.version} · Last checked ${update.lastChecked}`, badge: update.updateAvailable },
   ]
@@ -102,10 +93,9 @@ export default function Profile() {
       {activeSheet === 'types'        && <CategoryManager onClose={() => setActiveSheet(null)} />}
       {activeSheet === 'household'    && <HouseholdManager onClose={() => setActiveSheet(null)} />}
       {activeSheet === 'import'       && <ImportSheet onClose={() => setActiveSheet(null)} />}
+      {activeSheet === 'bank-import'  && <BankImportSheet onClose={() => setActiveSheet(null)} />}
       {activeSheet === 'update'       && <AppUpdateSheet onClose={() => setActiveSheet(null)} update={update} />}
       {activeSheet === 'sec-currency' && <SecondaryCurrencySheet onClose={() => setActiveSheet(null)} secEnabled={secEnabled} toggleSec={setSecEnabled} secCurrency={secCurrency} setSecCurrency={setSecCurrency} secRate={secRate} setSecRate={setSecRate} primaryCurrency={currency} />}
-      {activeSheet === 'email-import' && <EmailImportSetup onClose={() => setActiveSheet(null)} onNewImports={n => setPendingCount(c => c + n)} />}
-      {activeSheet === 'pending'      && <PendingImports onClose={() => setActiveSheet(null)} onAccepted={() => getPendingImports(user.uid, householdId).then(items => setPendingCount(items.length))} />}
     </div>
   )
 }
