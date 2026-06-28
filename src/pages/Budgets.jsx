@@ -189,6 +189,7 @@ export default function Budgets() {
                         )}
                       </div>
                       <div className="bl-section-cols">
+                        <span>Spent</span>
                         <span>Budgeted</span>
                         <span>Left</span>
                       </div>
@@ -212,23 +213,41 @@ export default function Budgets() {
 
                     return (
                       <div key={budget.id} className="bl-row" onClick={() => setDetailBudget(budget)}>
-                        <div className="bl-icon" style={{ background: dotColor + '28', color: dotColor }}>
-                          {icon}
-                        </div>
-                        <div className="bl-row-info">
-                          <div className="bl-name">{budget.category}</div>
-                          {(budget.recurring !== false || overridden) && (
-                            <div className="bl-badges">
-                              {budget.recurring !== false && <span className="bl-badge-recurring">↻ recurring</span>}
-                              {overridden && <span className="bl-badge-override">📅 {format(month,'MMM')} adjusted</span>}
+                        <div className="bl-row-top">
+                          <div className="bl-icon" style={{ background: dotColor + '28', color: dotColor }}>
+                            {icon}
+                          </div>
+                          <div className="bl-row-info">
+                            <div className="bl-name">{budget.category}</div>
+                            {(budget.recurring !== false || overridden) && (
+                              <div className="bl-badges">
+                                {budget.recurring !== false && <span className="bl-badge-recurring">↻ recurring</span>}
+                                {overridden && <span className="bl-badge-override">📅 {format(month,'MMM')} adjusted</span>}
+                              </div>
+                            )}
+                          </div>
+                          <div className="bl-row-right">
+                            <div className="bl-amt-cell">
+                              <span className="bl-amt-main">{fmtC(spent)}</span>
+                              {sec(spent) && <span className="bl-amt-sec">{sec(spent)}</span>}
                             </div>
-                          )}
+                            <div className="bl-amt-cell">
+                              <span className="bl-amt-main muted">{fmtC(amt)}</span>
+                              {sec(amt) && <span className="bl-amt-sec">{sec(amt)}</span>}
+                            </div>
+                            <div className="bl-amt-cell">
+                              <span className={`bl-left-pill ${pillStatus}`}>
+                                {over ? `-${fmtC(Math.abs(remaining))}` : fmtC(remaining)}
+                              </span>
+                              {sec(Math.abs(remaining)) && <span className="bl-amt-sec">{sec(Math.abs(remaining))}</span>}
+                            </div>
+                          </div>
                         </div>
-                        <div className="bl-row-right">
-                          <span className="bl-budgeted">{fmtC(amt)}</span>
-                          <span className={`bl-left-pill ${pillStatus}`}>
-                            {over ? `-${fmtC(Math.abs(remaining))}` : fmtC(remaining)}
-                          </span>
+                        <div className="bl-row-bar">
+                          <div className="bl-row-bar-fill" style={{
+                            width: `${Math.min(rawPct, 100)}%`,
+                            background: over ? 'var(--red)' : rawPct >= 80 ? 'var(--amber)' : dotColor
+                          }} />
                         </div>
                       </div>
                     )
