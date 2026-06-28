@@ -126,21 +126,38 @@ export default function Budgets() {
           <div className="load-row"><span className="spinner" /></div>
         ) : (
           <>
+            {/* Compact totals bar */}
             {budgets.length > 0 && (
-              <div className="budget-summary-card">
-                <div className="bsc-title">Total Monthly Budget</div>
-                <div className="bsc-total">{fmt(totalBudgeted)}</div>
-                {sec(totalBudgeted) && <div className="bsc-total-sec">{sec(totalBudgeted)}</div>}
-                <div className="bsc-subtitle">
-                  {fmt(totalSpent)} spent · {totalLeft >= 0 ? fmt(totalLeft)+' remaining' : fmt(Math.abs(totalLeft))+' over'}
+              <>
+                <div className="bl-totals-bar">
+                  <div className="bl-totals-cell">
+                    <span className="bl-totals-label">Spent</span>
+                    <span className="bl-totals-val expense">{fmtC(totalSpent)}</span>
+                    {sec(totalSpent) && <span className="bl-totals-sec">{sec(totalSpent)}</span>}
+                  </div>
+                  <div className="bl-totals-cell">
+                    <span className="bl-totals-label">Budget</span>
+                    <span className="bl-totals-val">{fmtC(totalBudgeted)}</span>
+                    {sec(totalBudgeted) && <span className="bl-totals-sec">{sec(totalBudgeted)}</span>}
+                  </div>
+                  <div className="bl-totals-cell">
+                    <span className="bl-totals-label">Left</span>
+                    <span className={`bl-totals-val ${totalLeft >= 0 ? 'income' : 'expense'}`}>
+                      {totalLeft >= 0 ? fmtC(totalLeft) : `-${fmtC(Math.abs(totalLeft))}`}
+                    </span>
+                    {sec(Math.abs(totalLeft)) && <span className="bl-totals-sec">{sec(Math.abs(totalLeft))}</span>}
+                  </div>
                 </div>
-                {sec(totalSpent) && <div className="bsc-subtitle-sec">{sec(totalSpent)} spent</div>}
-                <div className="bsc-track"><div className="bsc-fill" style={{ width:`${overallPct}%` }} /></div>
-                <div className="bsc-footer">
-                  <span className="bsc-progress-label">Overall Progress</span>
-                  <span className="bsc-pct">{Math.round(overallPct)}%</span>
+                <div className="bl-overall-wrap">
+                  <div className="bl-overall-track">
+                    <div className={`bl-overall-fill${totalLeft < 0 ? ' over' : ''}`} style={{ width:`${overallPct}%` }} />
+                  </div>
+                  <div className="bl-overall-meta">
+                    <span className="bl-overall-pct">{Math.round(overallPct)}% used</span>
+                    <span className="bl-overall-pct">{budgets.length} budget{budgets.length !== 1 ? 's' : ''}</span>
+                  </div>
                 </div>
-              </div>
+              </>
             )}
 
             {canWrite && (
@@ -155,68 +172,69 @@ export default function Budgets() {
                 <p>No budgets yet.<br />Tap + to set a spending limit.</p>
               </div>
             ) : (
-              <div className="budget-grid">
-                {sorted.map((budget, idx) => {
-                  const amt       = effectiveAmount(budget)
-                  const spent     = spending[budget.category]||0
-                  const rawPct    = amt > 0 ? (spent/amt)*100 : 0
-                  const pct       = Math.min(rawPct, 100)
-                  const over      = spent > amt
-                  const remaining = amt - spent
-                  const cat       = categories.find(c => c.name === budget.category)
-                  const icon      = cat?.icon || '📦'
-                  const status    = over ? 'danger' : rawPct >= 80 ? 'warn' : 'good'
-                  const dotColor  = DOT_COLORS[idx % DOT_COLORS.length]
-                  const overridden = hasOverride(budget)
-
+              <>
+                {/* Section header with column labels */}
+                {(() => {
+                  const now = new Date()
+                  const isCurrentMonth = format(month, 'yyyy-MM') === format(now, 'yyyy-MM')
+                  const daysLeft = isCurrentMonth
+                    ? Math.max(0, Math.ceil((endOfMonth(month) - now) / 86400000))
+                    : 0
                   return (
-                    <div key={budget.id} className="budget-card">
-                      {canWrite && (
-                        <button className="bc-edit-btn"
-                          onClick={e => { e.stopPropagation(); setEditBudget(budget) }}
-                          title="Edit budget">✎</button>
-                      )}
-                      <button className="bc-card-inner" onClick={() => setDetailBudget(budget)}>
-                        <div className="bc-card-header">
-                          <div>
-                            <div className="bc-card-name">
-                              {icon} {budget.category}
-                              {budget.recurring !== false && <span className="bc-recurring-badge">↻</span>}
-                              {overridden && <span className="bc-override-badge">~{format(month,'MMM')}</span>}
-                            </div>
-                            <div className="bc-card-amounts">{fmt(spent)} of {fmt(amt)}</div>
-                            {sec(spent) && <div className="bc-card-amounts-sec">{sec(spent)} of {sec(amt)}</div>}
-                          </div>
-                          <div className="bc-color-dot" style={{ background:dotColor }} />
-                        </div>
-                        <div className="bc-track">
-                          <div className={`bc-fill ${status}`} style={{ width:`${pct}%`, background:dotColor, opacity:over?1:0.85 }} />
-                        </div>
-                        <div className="bc-card-footer">
-                          <div className="bc-footer-left">
-                            <span className={`bc-status ${status}`}>
-                              {over ? '↘' : '↗'} {over ? `Over by ${fmtC(Math.abs(remaining))}` : `${fmtC(remaining)} left`}
-                            </span>
-                            {sec(Math.abs(remaining)) && <span className="bc-status-sec">{sec(Math.abs(remaining))}</span>}
-                          </div>
-                          <span className="bc-card-pct">{Math.round(rawPct)}%</span>
-                        </div>
-                        {rawPct >= 80 && !over && <div className="bc-warning-msg warn">⚠ Approaching budget limit</div>}
-                        {over && <div className="bc-warning-msg danger">⊘ Budget exceeded</div>}
-                      </button>
-
-                      {/* Month override button */}
-                      {canWrite && (
-                        <button className="bc-month-btn"
-                          onClick={e => { e.stopPropagation(); setOverrideBudget(budget) }}
-                          title={`Adjust for ${format(month,'MMM yyyy')}`}>
-                          📅 Adjust for {format(month,'MMM')}
-                        </button>
-                      )}
+                    <div className="bl-section-header">
+                      <div className="bl-section-left">
+                        <span className="bl-section-period">Monthly</span>
+                        {isCurrentMonth && (
+                          <span className="bl-section-days">{daysLeft} day{daysLeft !== 1 ? 's' : ''} left</span>
+                        )}
+                      </div>
+                      <div className="bl-section-cols">
+                        <span>Budgeted</span>
+                        <span>Left</span>
+                      </div>
                     </div>
                   )
-                })}
-              </div>
+                })()}
+
+                {/* Flat budget rows */}
+                <div className="bl-list">
+                  {sorted.map((budget, idx) => {
+                    const amt      = effectiveAmount(budget)
+                    const spent    = spending[budget.category] || 0
+                    const remaining = amt - spent
+                    const over     = spent > amt
+                    const rawPct   = amt > 0 ? (spent / amt) * 100 : 0
+                    const cat      = categories.find(c => c.name === budget.category)
+                    const icon     = cat?.icon || '📦'
+                    const pillStatus = over ? 'danger' : rawPct >= 80 ? 'warn' : 'good'
+                    const dotColor = DOT_COLORS[idx % DOT_COLORS.length]
+                    const overridden = hasOverride(budget)
+
+                    return (
+                      <div key={budget.id} className="bl-row" onClick={() => setDetailBudget(budget)}>
+                        <div className="bl-icon" style={{ background: dotColor + '28', color: dotColor }}>
+                          {icon}
+                        </div>
+                        <div className="bl-row-info">
+                          <div className="bl-name">{budget.category}</div>
+                          {(budget.recurring !== false || overridden) && (
+                            <div className="bl-badges">
+                              {budget.recurring !== false && <span className="bl-badge-recurring">↻ recurring</span>}
+                              {overridden && <span className="bl-badge-override">📅 {format(month,'MMM')} adjusted</span>}
+                            </div>
+                          )}
+                        </div>
+                        <div className="bl-row-right">
+                          <span className="bl-budgeted">{fmtC(amt)}</span>
+                          <span className={`bl-left-pill ${pillStatus}`}>
+                            {over ? `-${fmtC(Math.abs(remaining))}` : fmtC(remaining)}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
             )}
 
             {/* Unbudgeted */}
@@ -309,6 +327,12 @@ export default function Budgets() {
                     background:(spending[detailBudget.category]||0) > effectiveAmount(detailBudget) ? 'var(--red)' : 'var(--green)'
                   }} />
                 </div>
+                {canWrite && (
+                  <button className="bc-month-btn" style={{ marginTop:12, width:'100%', padding:'10px 14px', fontSize:13, fontWeight:600, color:'var(--text-muted)', background:'var(--bg-elevated)', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)', textAlign:'left' }}
+                    onClick={() => { setDetailBudget(null); setOverrideBudget(detailBudget) }}>
+                    📅 Adjust budget for {format(month,'MMMM yyyy')}
+                  </button>
+                )}
               </div>
               {detailTxs.length === 0 ? (
                 <div className="empty-state"><span className="icon">💸</span><p>No transactions this month.</p></div>
