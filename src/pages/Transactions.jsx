@@ -23,6 +23,7 @@ export default function Transactions() {
   const [selectMode, setSelectMode]     = useState(false)
   const [selected, setSelected]         = useState(new Set())
   const [deleting, setDeleting]         = useState(false)
+  const [deleteError, setDeleteError]   = useState('')
 
   useEffect(() => { if (user) load() }, [user, month, householdId, reloadTrigger])
 
@@ -61,11 +62,14 @@ export default function Transactions() {
   const handleDeleteSelected = async () => {
     if (!selected.size || deleting) return
     setDeleting(true)
+    setDeleteError('')
     try {
       await moveToTrash(user.uid, householdId, [...selected])
       triggerReload()
       load()
       exitSelectMode()
+    } catch (e) {
+      setDeleteError(e.message || 'Could not move to trash. Please try again.')
     } finally { setDeleting(false) }
   }
 
@@ -161,9 +165,11 @@ export default function Transactions() {
 
       {selectMode && (
         <div className="txns-select-bar">
-          <span className="txns-select-count">
-            {selected.size} selected
-          </span>
+          {deleteError ? (
+            <span className="txns-select-err">{deleteError}</span>
+          ) : (
+            <span className="txns-select-count">{selected.size} selected</span>
+          )}
           <button
             className="txns-delete-btn"
             disabled={selected.size === 0 || deleting}

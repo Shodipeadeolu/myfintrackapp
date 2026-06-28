@@ -61,6 +61,9 @@
 .txns-select-count {
   font-size: 13px; font-weight: 600; color: var(--text-secondary); flex-shrink: 0;
 }
+.txns-select-err {
+  font-size: 12px; font-weight: 600; color: var(--red); flex: 1;
+}
 .txns-delete-btn {
   flex: 1; padding: 11px 16px; border-radius: var(--radius-sm);
   background: var(--red-light); color: var(--red);
