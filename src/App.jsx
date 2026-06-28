@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useApp } from './context/AppContext'
 import BottomNav from './components/BottomNav'
 import FAB from './components/FAB'
@@ -29,24 +29,6 @@ export default function App() {
   const [showAdd, setShowAdd] = useState(false)
   const [addKey, setAddKey] = useState(0)
 
-  // Touch swipe between tabs
-  const touchStart = useRef(null)
-  const TABS = ['home', 'transactions', 'budgets', 'stats', 'profile']
-
-  const handleTouchStart = (e) => {
-    touchStart.current = e.touches[0].clientX
-  }
-
-  const handleTouchEnd = (e) => {
-    if (touchStart.current === null) return
-    const diff = touchStart.current - e.changedTouches[0].clientX
-    if (Math.abs(diff) < 60) return
-    const idx = TABS.indexOf(tab)
-    if (diff > 0 && idx < TABS.length - 1) setTab(TABS[idx + 1])
-    if (diff < 0 && idx > 0) setTab(TABS[idx - 1])
-    touchStart.current = null
-  }
-
   const navigate = (newTab, subTab) => {
     setTab(newTab)
     if (subTab) setProfileTab(subTab)
@@ -71,11 +53,7 @@ export default function App() {
   if (!user) return <Auth />
 
   return (
-    <div
-      className="app-root"
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-    >
+    <div className="app-root">
       {updateAvailable && (
         <div className="update-banner-global">
           <span className="update-banner-global-text">⚡ New version available</span>
