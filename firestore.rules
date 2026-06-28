@@ -16,6 +16,20 @@ service cloud.firestore {
         hh.data.members.filter(m, m.userId == request.auth.uid).size() > 0
       );
     }
+    function isSavingsAccountOwner(accountId) {
+      let acc = get(/databases/$(database)/documents/savingsAccounts/$(accountId));
+      return acc != null && (
+        acc.data.ownerId == request.auth.uid ||
+        isHouseholdMember(acc.data.ownerId)
+      );
+    }
+    function isLoanAccountOwner(accountId) {
+      let acc = get(/databases/$(database)/documents/loanAccounts/$(accountId));
+      return acc != null && (
+        acc.data.ownerId == request.auth.uid ||
+        isHouseholdMember(acc.data.ownerId)
+      );
+    }
 
     // ── Users ─────────────────────────────────────────────────
     match /users/{userId} {
@@ -52,6 +66,59 @@ service cloud.firestore {
              isHouseholdMember(request.resource.data.ownerId))
           : (resource.data.ownerId == request.auth.uid ||
              isHouseholdMember(resource.data.ownerId))
+      );
+    }
+
+    // ── Budget Overrides (per-month adjustments) ──────────────
+    match /budgetOverrides/{ovId} {
+      allow read, write: if isSignedIn() && (
+        resource == null
+          ? (request.resource.data.ownerId == request.auth.uid ||
+             isHouseholdMember(request.resource.data.ownerId))
+          : (resource.data.ownerId == request.auth.uid ||
+             isHouseholdMember(resource.data.ownerId))
+      );
+    }
+
+    // ── Savings Accounts ──────────────────────────────────────
+    match /savingsAccounts/{accId} {
+      allow read, write: if isSignedIn() && (
+        resource == null
+          ? (request.resource.data.ownerId == request.auth.uid ||
+             isHouseholdMember(request.resource.data.ownerId))
+          : (resource.data.ownerId == request.auth.uid ||
+             isHouseholdMember(resource.data.ownerId))
+      );
+    }
+
+    // ── Savings Transactions ──────────────────────────────────
+    match /savingsTxs/{txId} {
+      allow read, write: if isSignedIn() && (
+        resource == null
+          ? (request.resource.data.createdBy == request.auth.uid)
+          : (resource.data.createdBy == request.auth.uid ||
+             isSavingsAccountOwner(resource.data.accountId))
+      );
+    }
+
+    // ── Loan Accounts ─────────────────────────────────────────
+    match /loanAccounts/{accId} {
+      allow read, write: if isSignedIn() && (
+        resource == null
+          ? (request.resource.data.ownerId == request.auth.uid ||
+             isHouseholdMember(request.resource.data.ownerId))
+          : (resource.data.ownerId == request.auth.uid ||
+             isHouseholdMember(resource.data.ownerId))
+      );
+    }
+
+    // ── Loan Transactions ─────────────────────────────────────
+    match /loanTxs/{txId} {
+      allow read, write: if isSignedIn() && (
+        resource == null
+          ? (request.resource.data.createdBy == request.auth.uid)
+          : (resource.data.createdBy == request.auth.uid ||
+             isLoanAccountOwner(resource.data.accountId))
       );
     }
 
