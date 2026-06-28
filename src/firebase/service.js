@@ -67,6 +67,67 @@ export const batchAddTransactions = async (userId, householdId, transactions, on
   return imported
 }
 
+// ─── Trash (soft-delete with 30-day auto-purge) ───────────────
+const TRASH_TTL_DAYS = 30
+
+export const moveToTrash = async (userId, householdId, txIds) => {
+  const ownerId  = householdId || userId
+  const deletedAt = new Date().toISOString()
+  const BATCH_SIZE = 200 // 2 ops per tx (set trash + delete tx)
+
+  for (let i = 0; i < txIds.length; i += BATCH_SIZE) {
+    const chunk = txIds.slice(i, i + BATCH_SIZE)
+    const snaps  = await Promise.all(chunk.map(id => getDoc(doc(db, 'transactions', id))))
+    const batch  = writeBatch(db)
+    snaps.forEach((snap, j) => {
+      if (!snap.exists()) return
+      const trashRef = doc(collection(db, 'trash'))
+      batch.set(trashRef, { ...snap.data(), originalId: chunk[j], deletedAt, ownerId })
+      batch.delete(doc(db, 'transactions', chunk[j]))
+    })
+    await batch.commit()
+  }
+}
+
+export const getTrashItems = async (userId, householdId) => {
+  const ownerId = householdId || userId
+  const snap    = await getDocs(query(collection(db, 'trash'), where('ownerId', '==', ownerId)))
+  const items   = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - TRASH_TTL_DAYS)
+  const cutoffStr = cutoff.toISOString()
+
+  // Silently purge expired items
+  const stale = items.filter(it => it.deletedAt < cutoffStr)
+  if (stale.length) {
+    const batch = writeBatch(db)
+    stale.forEach(it => batch.delete(doc(db, 'trash', it.id)))
+    batch.commit().catch(() => {})
+  }
+
+  return items
+    .filter(it => it.deletedAt >= cutoffStr)
+    .sort((a, b) => b.deletedAt.localeCompare(a.deletedAt))
+}
+
+export const restoreFromTrash = async (userId, householdId, trashItems) => {
+  const ownerId = householdId || userId
+  const batch   = writeBatch(db)
+  trashItems.forEach(item => {
+    const { id: trashId, originalId, deletedAt, ...txData } = item
+    batch.set(doc(collection(db, 'transactions')), { ...txData, ownerId })
+    batch.delete(doc(db, 'trash', trashId))
+  })
+  return batch.commit()
+}
+
+export const purgeTrashItems = async (trashIds) => {
+  const batch = writeBatch(db)
+  trashIds.forEach(id => batch.delete(doc(db, 'trash', id)))
+  return batch.commit()
+}
+
 // ─── Categories ──────────────────────────────────────────────
 export const getCategories = async (userId, householdId) => {
   const uid = householdId || userId

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
-import { getTransactions } from '../firebase/service'
+import { getTransactions, moveToTrash } from '../firebase/service'
 import { fmtCurrency, fmtCurrencyCompact, toFirestoreDate } from '../utils/helpers'
 import { fmtSec } from '../utils/secCurrency'
 import { startOfMonth, endOfMonth } from 'date-fns'
@@ -11,7 +11,7 @@ import './Transactions.css'
 
 export default function Transactions() {
   const {
-    user, householdId, categories, reloadTrigger, currency,
+    user, householdId, categories, reloadTrigger, triggerReload, currency,
     secEnabled, secCurrency, secRate
   } = useApp()
   const [month, setMonth]               = useState(new Date())
@@ -20,6 +20,9 @@ export default function Transactions() {
   const [filter, setFilter]             = useState('all')
   const [search, setSearch]             = useState('')
   const [editTx, setEditTx]             = useState(null)
+  const [selectMode, setSelectMode]     = useState(false)
+  const [selected, setSelected]         = useState(new Set())
+  const [deleting, setDeleting]         = useState(false)
 
   useEffect(() => { if (user) load() }, [user, month, householdId, reloadTrigger])
 
@@ -49,6 +52,22 @@ export default function Transactions() {
 
   const grouped     = filtered.reduce((acc, tx) => { if (!acc[tx.date]) acc[tx.date] = []; acc[tx.date].push(tx); return acc }, {})
   const sortedDates = Object.keys(grouped).sort((a,b) => b.localeCompare(a))
+
+  const toggleSelect = (id) =>
+    setSelected(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+
+  const exitSelectMode = () => { setSelectMode(false); setSelected(new Set()) }
+
+  const handleDeleteSelected = async () => {
+    if (!selected.size || deleting) return
+    setDeleting(true)
+    try {
+      await moveToTrash(user.uid, householdId, [...selected])
+      triggerReload()
+      load()
+      exitSelectMode()
+    } finally { setDeleting(false) }
+  }
 
   const exportCSV = () => {
     const rows = [
@@ -96,6 +115,11 @@ export default function Transactions() {
             {search && <button onClick={() => setSearch('')} className="clear-search">✕</button>}
           </div>
           <button className="export-btn" onClick={exportCSV}>↓ Export</button>
+          <button
+            className={`select-btn${selectMode ? ' active' : ''}`}
+            onClick={() => { selectMode ? exitSelectMode() : setSelectMode(true) }}>
+            {selectMode ? 'Cancel' : 'Select'}
+          </button>
         </div>
         <div className="seg-control">
           {[['all','All'],['income','Income'],['expense','Expenses']].map(([v,l]) => (
@@ -118,7 +142,12 @@ export default function Transactions() {
             <div key={date} className="date-group">
               <div className="date-label">{formatGroupDate(date)}</div>
               {grouped[date].map(tx => (
-                <TransactionItem key={tx.id} tx={tx} categories={categories} onClick={setEditTx} />
+                <TransactionItem
+                  key={tx.id} tx={tx} categories={categories}
+                  selectMode={selectMode}
+                  selected={selected.has(tx.id)}
+                  onClick={selectMode ? () => toggleSelect(tx.id) : setEditTx}
+                />
               ))}
             </div>
           ))
@@ -128,6 +157,20 @@ export default function Transactions() {
       {editTx && (
         <AddTransaction tx={editTx} onClose={() => setEditTx(null)}
           onSaved={() => { setEditTx(null); load() }} />
+      )}
+
+      {selectMode && (
+        <div className="txns-select-bar">
+          <span className="txns-select-count">
+            {selected.size} selected
+          </span>
+          <button
+            className="txns-delete-btn"
+            disabled={selected.size === 0 || deleting}
+            onClick={handleDeleteSelected}>
+            {deleting ? 'Moving…' : `Move to Trash (${selected.size})`}
+          </button>
+        </div>
       )}
     </div>
   )

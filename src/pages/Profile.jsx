@@ -5,6 +5,7 @@ import CategoryManager from '../components/CategoryManager'
 import HouseholdManager from '../components/HouseholdManager'
 import ImportSheet from '../components/ImportSheet'
 import BankImportSheet from '../components/BankImportSheet'
+import TrashSheet from '../components/TrashSheet'
 import CurrencyPicker from '../components/CurrencyPicker'
 import AppUpdateSheet from '../components/AppUpdateSheet'
 import SecondaryCurrencySheet from '../components/SecondaryCurrencySheet'
@@ -34,6 +35,7 @@ export default function Profile() {
     { id: 'household',    icon: '🏠', label: 'Household',             desc: household ? household.name : 'Create or join a household' },
     { id: 'bank-import',   icon: '🏦', label: 'Import Bank Statement', desc: 'Upload CSV, XLSX or PDF from your bank' },
     { id: 'import',        icon: '📥', label: 'Import (XLSX Export)',  desc: 'Re-import a FinTrack export file' },
+    { id: 'trash',         icon: '🗑️', label: 'Trash',                desc: 'Recover deleted transactions · auto-clears after 30 days' },
     { id: 'rollover',      icon: '🔄', label: 'Balance Rollover',      desc: balanceRollover ? 'On — closing balance carries forward' : 'Off — each month starts fresh', toggle: true, toggleValue: balanceRollover, onToggle: () => setBalanceRollover(!balanceRollover) },
     { id: 'update',       icon: '🔃', label: 'App Update',            desc: update.updateAvailable ? '🟢 Update available!' : `v${update.version} · Last checked ${update.lastChecked}`, badge: update.updateAvailable },
   ]
@@ -96,6 +98,7 @@ export default function Profile() {
       {activeSheet === 'bank-import'  && <BankImportSheet onClose={() => setActiveSheet(null)} />}
       {activeSheet === 'update'       && <AppUpdateSheet onClose={() => setActiveSheet(null)} update={update} />}
       {activeSheet === 'sec-currency' && <SecondaryCurrencySheet onClose={() => setActiveSheet(null)} secEnabled={secEnabled} toggleSec={setSecEnabled} secCurrency={secCurrency} setSecCurrency={setSecCurrency} secRate={secRate} setSecRate={setSecRate} primaryCurrency={currency} />}
+      {activeSheet === 'trash'        && <TrashSheet onClose={() => setActiveSheet(null)} />}
     </div>
   )
 }

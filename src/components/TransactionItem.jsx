@@ -18,7 +18,7 @@ const TYPE_CONFIG = {
   loans:   { arrow: '💳', badgeBg: 'rgba(74,128,232,0.12)', arrowColor: '#4a80e8',       amtColor: '#4a80e8',       prefix: '' },
 }
 
-export default function TransactionItem({ tx, categories, onClick }) {
+export default function TransactionItem({ tx, categories, onClick, selectMode, selected }) {
   const { currency, secEnabled, secCurrency, secRate } = useApp()
   const cat    = categories.find(c => c.name === tx.category)
   const icon   = cat?.icon || '📦'
@@ -28,12 +28,18 @@ export default function TransactionItem({ tx, categories, onClick }) {
   const secAmt     = secEnabled ? fmtSec(tx.amount, secEnabled, secRate, secCurrency) : null
 
   return (
-    <button className="tx-item" onClick={() => onClick && onClick(tx)}>
+    <button
+      className={`tx-item${selected ? ' tx-selected' : ''}`}
+      onClick={() => onClick && onClick(tx)}>
+      {selectMode ? (
+        <div className={`tx-sel-dot${selected ? ' checked' : ''}`} />
+      ) : (
       <div className="tx-badge" style={{ background: config.badgeBg }}>
         <span className="tx-badge-arrow" style={{ color: config.arrowColor }}>
           {config.arrow}
         </span>
       </div>
+      )}
       <div className="tx-info">
         <div className="tx-name">{tx.note || tx.category}</div>
         <div className="tx-meta">

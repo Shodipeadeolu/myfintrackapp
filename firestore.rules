@@ -67,6 +67,17 @@ service cloud.firestore {
       allow read, write: if isSignedIn() && isOwner(userId);
     }
 
+    // ── Trash (soft-deleted transactions, auto-purge after 30 days) ──
+    match /trash/{docId} {
+      allow read, write: if isSignedIn() && (
+        resource == null
+          ? (request.resource.data.ownerId == request.auth.uid ||
+             isHouseholdMember(request.resource.data.ownerId))
+          : (resource.data.ownerId == request.auth.uid ||
+             isHouseholdMember(resource.data.ownerId))
+      );
+    }
+
     // ── Category Mappings (smart auto-categorization) ─────────
     match /categoryMappings/{mappingId} {
       allow read, write: if isSignedIn() && (
