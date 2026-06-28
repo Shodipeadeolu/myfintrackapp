@@ -11,7 +11,10 @@ service cloud.firestore {
     }
     function isHouseholdMember(householdId) {
       let hh = get(/databases/$(database)/documents/households/$(householdId));
-      return hh != null && request.auth.uid in hh.data.members.map(m, m.userId);
+      return hh != null && (
+        hh.data.ownerId == request.auth.uid ||
+        hh.data.members.filter(m, m.userId == request.auth.uid).size() > 0
+      );
     }
 
     // ── Users ─────────────────────────────────────────────────
@@ -58,7 +61,7 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
       allow update, delete: if isSignedIn() && (
         resource.data.ownerId == request.auth.uid ||
-        request.auth.uid in resource.data.members.map(m, m.userId)
+        resource.data.members.filter(m, m.userId == request.auth.uid).size() > 0
       );
     }
 
