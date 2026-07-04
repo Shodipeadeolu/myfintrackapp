@@ -150,13 +150,18 @@ export default function AddTransaction({ tx, onClose, onSaved }) {
             <span className="currency-sym">{getSym(currency || 'USD')}</span>
             <input
               type="text" inputMode="decimal" placeholder="0.00"
-              value={amount ? parseFloat(amount.replace(/,/g,'')).toLocaleString('en-US', {maximumFractionDigits:2}) : ''}
+              value={
+                !amount || amount === '-' ? amount
+                : isNaN(parseFloat(amount)) ? ''
+                : parseFloat(amount).toLocaleString('en-US', {maximumFractionDigits:2})
+              }
               onChange={e => {
-                // Strip commas, keep only digits and one decimal point
+                // Strip commas, keep a leading minus sign, digits, and one decimal point
+                const negative = e.target.value.trim().startsWith('-')
                 const raw = e.target.value.replace(/,/g, '').replace(/[^0-9.]/g, '')
                 const parts = raw.split('.')
                 const clean = parts.length > 1 ? parts[0] + '.' + parts[1] : parts[0]
-                setAmount(clean)
+                setAmount(negative ? '-' + clean : clean)
               }}
               className="amount-input" autoFocus={!editing}
             />

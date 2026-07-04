@@ -93,7 +93,7 @@ export default function Home({ onNavigate }) {
         {/* Balance card */}
         <div className="balance-card">
           <div className="balance-nav-row">
-            <MonthNavigator date={month} onChange={setMonth} />
+            <MonthNavigator date={month} onChange={setMonth} allowFuture />
           </div>
           <div className="balance-label-row">
             <div className="balance-label">TOTAL BALANCE</div>

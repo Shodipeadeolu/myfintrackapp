@@ -89,7 +89,7 @@ export default function Transactions() {
     <div className="screen">
       <div className="txns-header">
         <h2 className="page-title">All Transactions</h2>
-        <MonthNavigator date={month} onChange={setMonth} />
+        <MonthNavigator date={month} onChange={setMonth} allowFuture />
       </div>
       <div className="txns-subtitle">View and manage all your financial transactions</div>
 
