@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import { getTransactions } from '../firebase/service'
-import { getBudgets, addBudget, updateBudget, deleteBudget, getBudgetOverrides, setBudgetOverride, deleteBudgetOverride } from '../firebase/budgets'
+import { getBudgets, addBudget, updateBudget, deleteBudget, getBudgetOverrides, getBudgetOverridesRange, setBudgetOverride, deleteBudgetOverride } from '../firebase/budgets'
 import { fmtCurrency, fmtCurrencyCompact, toFirestoreDate } from '../utils/helpers'
 import { fmtSec } from '../utils/secCurrency'
-import { startOfMonth, endOfMonth, format } from 'date-fns'
+import { startOfMonth, endOfMonth, startOfYear, endOfYear, format } from 'date-fns'
 import MonthNavigator from '../components/MonthNavigator'
+import YearNavigator from '../components/YearNavigator'
 import TransactionItem from '../components/TransactionItem'
 import AddTransaction from '../components/AddTransaction'
 import CategoryPicker from '../components/CategoryPicker'
@@ -19,11 +20,21 @@ const CURRENCY_SYMBOLS = {
 }
 const DOT_COLORS = ['#7c3aed','#e8421a','#00c48c','#4a80e8','#f5a623','#ef4444','#06b6d4','#ec4899']
 
+// A budget with recurring=false only applies to the month it was created for.
+// Legacy budgets with no startMonth recorded stay visible everywhere (unchanged behavior).
+const isBudgetActiveInMonth = (budget, monthKey) => {
+  if (!budget.startMonth) return true
+  if (budget.recurring === false) return budget.startMonth === monthKey
+  return budget.startMonth <= monthKey
+}
+
 export default function Budgets() {
   const { user, householdId, categories, canWrite, reloadTrigger, currency, secEnabled, secCurrency, secRate } = useApp()
   const [month, setMonth]             = useState(new Date())
+  const [viewMode, setViewMode]       = useState('monthly') // 'monthly' | 'annual'
   const [budgets, setBudgets]         = useState([])
-  const [overrides, setOverrides]     = useState([]) // monthly overrides
+  const [overrides, setOverrides]     = useState([]) // monthly overrides (monthly view)
+  const [yearOverrides, setYearOverrides] = useState([]) // overrides across the year (annual view)
   const [allTxs, setAllTxs]           = useState([])
   const [spending, setSpending]       = useState({})
   const [loading, setLoading]         = useState(true)
@@ -36,48 +47,79 @@ export default function Budgets() {
   const [overrideBudget, setOverrideBudget] = useState(null)
 
   const monthKey = format(month, 'yyyy-MM')
+  const year     = format(month, 'yyyy')
+  const yearMonthKeys = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`)
 
-  useEffect(() => { if (user) load() }, [user, month, householdId, reloadTrigger])
+  useEffect(() => { if (user) load() }, [user, month, householdId, reloadTrigger, viewMode])
 
   const load = async () => {
     if (!user) return
     setLoading(true)
     try {
-      const [buds, ovs, txs] = await Promise.all([
-        getBudgets(user.uid, householdId),
-        getBudgetOverrides(user.uid, householdId, monthKey),
-        getTransactions(user.uid, householdId,
-          toFirestoreDate(startOfMonth(month)),
-          toFirestoreDate(endOfMonth(month))
-        )
-      ])
+      const buds = await getBudgets(user.uid, householdId)
       setBudgets(buds)
-      setOverrides(ovs)
-      setAllTxs(txs)
-      const map = {}
-      txs.filter(t => t.type === 'expense').forEach(t => { map[t.category] = (map[t.category]||0) + t.amount })
-      setSpending(map)
+      if (viewMode === 'annual') {
+        const [ovs, txs] = await Promise.all([
+          getBudgetOverridesRange(user.uid, householdId, `${year}-01`, `${year}-12`),
+          getTransactions(user.uid, householdId,
+            toFirestoreDate(startOfYear(month)),
+            toFirestoreDate(endOfYear(month))
+          )
+        ])
+        setYearOverrides(ovs)
+        setAllTxs(txs)
+        const map = {}
+        txs.filter(t => t.type === 'expense').forEach(t => { map[t.category] = (map[t.category]||0) + t.amount })
+        setSpending(map)
+      } else {
+        const [ovs, txs] = await Promise.all([
+          getBudgetOverrides(user.uid, householdId, monthKey),
+          getTransactions(user.uid, householdId,
+            toFirestoreDate(startOfMonth(month)),
+            toFirestoreDate(endOfMonth(month))
+          )
+        ])
+        setOverrides(ovs)
+        setAllTxs(txs)
+        const map = {}
+        txs.filter(t => t.type === 'expense').forEach(t => { map[t.category] = (map[t.category]||0) + t.amount })
+        setSpending(map)
+      }
     } finally { setLoading(false) }
   }
 
-  // Get effective amount for a budget this month (override takes priority)
+  // Sum of each month's applicable amount (override or base) across the year
+  const annualBudgetedAmount = (budget) => {
+    return yearMonthKeys.reduce((sum, mk) => {
+      if (!isBudgetActiveInMonth(budget, mk)) return sum
+      const ov = yearOverrides.find(o => o.budgetId === budget.id && o.monthKey === mk)
+      return sum + (ov ? ov.amount : budget.amount)
+    }, 0)
+  }
+
+  // Get effective amount for a budget in the current period (override takes priority)
   const effectiveAmount = (budget) => {
+    if (viewMode === 'annual') return annualBudgetedAmount(budget)
     const ov = overrides.find(o => o.budgetId === budget.id)
     return ov ? ov.amount : budget.amount
   }
 
-  const hasOverride = (budget) => overrides.some(o => o.budgetId === budget.id)
+  const hasOverride = (budget) => viewMode !== 'annual' && overrides.some(o => o.budgetId === budget.id)
+
+  const visibleBudgets = viewMode === 'annual'
+    ? budgets.filter(b => yearMonthKeys.some(mk => isBudgetActiveInMonth(b, mk)))
+    : budgets.filter(b => isBudgetActiveInMonth(b, monthKey))
 
   const fmt  = n => fmtCurrency(n, currency)
   const fmtC = n => fmtCurrencyCompact(n, currency)
   const sec  = n => fmtSec(n, secEnabled, secRate, secCurrency)
 
-  const totalBudgeted = budgets.reduce((a, b) => a + effectiveAmount(b), 0)
-  const totalSpent    = budgets.reduce((a, b) => a + (spending[b.category]||0), 0)
+  const totalBudgeted = visibleBudgets.reduce((a, b) => a + effectiveAmount(b), 0)
+  const totalSpent    = visibleBudgets.reduce((a, b) => a + (spending[b.category]||0), 0)
   const totalLeft     = totalBudgeted - totalSpent
   const overallPct    = totalBudgeted > 0 ? Math.min((totalSpent/totalBudgeted)*100, 100) : 0
 
-  const sorted = [...budgets].sort((a, b) => {
+  const sorted = [...visibleBudgets].sort((a, b) => {
     const aS = spending[a.category]||0, bS = spending[b.category]||0
     const aO = aS > effectiveAmount(a), bO = bS > effectiveAmount(b)
     if (aO !== bO) return aO ? -1 : 1
@@ -102,7 +144,7 @@ export default function Budgets() {
     ? (detailBySubcat[drillSubcat]?.txs || []).sort((a,b) => (b.date||'').localeCompare(a.date||''))
     : []
 
-  const budgetedCats     = new Set(budgets.map(b => b.category))
+  const budgetedCats     = new Set(visibleBudgets.map(b => b.category))
   const unbudgetedTxs    = allTxs.filter(t => t.type === 'expense' && !budgetedCats.has(t.category))
   const unbudgetedTotal  = unbudgetedTxs.reduce((a,t) => a+t.amount, 0)
   const unbudgetedByCat  = {}
@@ -117,9 +159,16 @@ export default function Budgets() {
     <div className="screen">
       <div className="budgets-header">
         <h2 className="page-title">Budget Overview</h2>
-        <MonthNavigator date={month} onChange={setMonth} allowFuture />
+        {viewMode === 'monthly'
+          ? <MonthNavigator date={month} onChange={setMonth} allowFuture />
+          : <YearNavigator date={month} onChange={setMonth} allowFuture />}
       </div>
-      <div className="budgets-subtitle">Track and manage your monthly budgets</div>
+      <div className="budgets-subtitle">Track and manage your {viewMode === 'monthly' ? 'monthly' : 'annual'} budgets</div>
+
+      <div className="view-toggle">
+        <button className={`view-toggle-btn ${viewMode === 'monthly' ? 'active' : ''}`} onClick={() => setViewMode('monthly')}>Monthly</button>
+        <button className={`view-toggle-btn ${viewMode === 'annual' ? 'active' : ''}`} onClick={() => setViewMode('annual')}>Annual</button>
+      </div>
 
       <div className="scroll-area">
         {loading ? (
@@ -127,7 +176,7 @@ export default function Budgets() {
         ) : (
           <>
             {/* Compact totals bar */}
-            {budgets.length > 0 && (
+            {visibleBudgets.length > 0 && (
               <>
                 <div className="bl-totals-bar">
                   <div className="bl-totals-cell">
@@ -154,16 +203,19 @@ export default function Budgets() {
                   </div>
                   <div className="bl-overall-meta">
                     <span className="bl-overall-pct">{Math.round(overallPct)}% used</span>
-                    <span className="bl-overall-pct">{budgets.length} budget{budgets.length !== 1 ? 's' : ''}</span>
+                    <span className="bl-overall-pct">{visibleBudgets.length} budget{visibleBudgets.length !== 1 ? 's' : ''}</span>
                   </div>
                 </div>
               </>
             )}
 
-            {canWrite && (
+            {canWrite && viewMode === 'monthly' && (
               <button className="budget-create-btn" onClick={() => setShowAdd(true)}>
                 <span style={{ fontSize:18 }}>＋</span> Create New Budget
               </button>
+            )}
+            {canWrite && viewMode === 'annual' && (
+              <div className="annual-create-hint">Switch to Monthly to create a new budget</div>
             )}
 
             {sorted.length === 0 ? (
@@ -176,14 +228,14 @@ export default function Budgets() {
                 {/* Section header with column labels */}
                 {(() => {
                   const now = new Date()
-                  const isCurrentMonth = format(month, 'yyyy-MM') === format(now, 'yyyy-MM')
+                  const isCurrentMonth = viewMode === 'monthly' && format(month, 'yyyy-MM') === format(now, 'yyyy-MM')
                   const daysLeft = isCurrentMonth
                     ? Math.max(0, Math.ceil((endOfMonth(month) - now) / 86400000))
                     : 0
                   return (
                     <div className="bl-section-header">
                       <div className="bl-section-left">
-                        <span className="bl-section-period">Monthly</span>
+                        <span className="bl-section-period">{viewMode === 'monthly' ? 'Monthly' : format(month, 'yyyy')}</span>
                         {isCurrentMonth && (
                           <span className="bl-section-days">{daysLeft} day{daysLeft !== 1 ? 's' : ''} left</span>
                         )}
@@ -346,7 +398,7 @@ export default function Budgets() {
                     background:(spending[detailBudget.category]||0) > effectiveAmount(detailBudget) ? 'var(--red)' : 'var(--green)'
                   }} />
                 </div>
-                {canWrite && (
+                {canWrite && viewMode === 'monthly' && (
                   <button className="bc-month-btn" style={{ marginTop:12, width:'100%', padding:'10px 14px', fontSize:13, fontWeight:600, color:'var(--text-muted)', background:'var(--bg-elevated)', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)', textAlign:'left' }}
                     onClick={() => { setDetailBudget(null); setOverrideBudget(detailBudget) }}>
                     📅 Adjust budget for {format(month,'MMMM yyyy')}
@@ -434,7 +486,8 @@ export default function Budgets() {
         <BudgetSheet
           budget={editBudget}
           categories={categories.filter(c => c.type === 'expense')}
-          existingCategories={budgets.map(b => b.category)}
+          existingCategories={visibleBudgets.map(b => b.category)}
+          monthKey={monthKey}
           onClose={() => { setShowAdd(false); setEditBudget(null) }}
           onSaved={handleSaved} onDeleted={handleSaved}
           user={user} householdId={householdId} currency={currency}
@@ -529,7 +582,7 @@ function MonthOverrideSheet({ budget, month, monthKey, currentOverride, currency
 }
 
 // ── Budget Sheet (create/edit base budget) ────────────────────
-function BudgetSheet({ budget, categories, existingCategories, onClose, onSaved, onDeleted, user, householdId, currency }) {
+function BudgetSheet({ budget, categories, existingCategories, monthKey, onClose, onSaved, onDeleted, user, householdId, currency }) {
   const editing = !!budget
   const [category, setCategory] = useState(budget?.category||'')
   const [amount, setAmount]     = useState(budget?.amount ? String(budget.amount) : '')
@@ -551,6 +604,14 @@ function BudgetSheet({ budget, categories, existingCategories, onClose, onSaved,
     setErr(''); setSaving(true)
     try {
       const data = { category, amount: amt, note: note.trim(), recurring }
+      if (!editing) {
+        // New budget: scope it to the month it's being created in.
+        data.startMonth = monthKey
+      } else if (!recurring && !budget.startMonth) {
+        // Legacy budget (predates startMonth tracking) just switched to non-recurring —
+        // anchor it to the month being viewed so the toggle actually takes effect.
+        data.startMonth = monthKey
+      }
       editing ? await updateBudget(budget.id, data) : await addBudget(user.uid, householdId, data)
       onSaved()
     } catch { setErr('Save failed.') } finally { setSaving(false) }
@@ -600,7 +661,13 @@ function BudgetSheet({ budget, categories, existingCategories, onClose, onSaved,
           <div className="budget-recurring-row">
             <div className="budget-recurring-info">
               <div className="budget-recurring-label">Repeat Every Month</div>
-              <div className="budget-recurring-desc">Auto-carry this budget to the next month</div>
+              <div className="budget-recurring-desc">
+                {recurring
+                  ? 'Auto-carry this budget to future months'
+                  : editing
+                    ? 'Only applies to the month it was created for'
+                    : `Only applies to ${format(new Date(monthKey + '-02'), 'MMMM yyyy')}`}
+              </div>
             </div>
             <button className={`profile-toggle ${recurring ? 'on' : 'off'}`} onClick={() => setRecurring(v => !v)}>
               <div className="profile-toggle-knob" />

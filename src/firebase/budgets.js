@@ -69,6 +69,16 @@ export const setBudgetOverride = async (userId, householdId, budgetId, monthKey,
   }
 }
 
+export const getBudgetOverridesRange = async (userId, householdId, startKey, endKey) => {
+  const uid = householdId || userId
+  // Equality-only query (avoids needing a composite index for ownerId + monthKey range);
+  // filter the range client-side since overrides per household are a small set.
+  const snap = await getDocs(query(collection(db, 'budgetOverrides'), where('ownerId', '==', uid)))
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(o => o.monthKey >= startKey && o.monthKey <= endKey)
+}
+
 export const deleteBudgetOverride = async (userId, householdId, budgetId, monthKey) => {
   const uid = householdId || userId
   const snap = await getDocs(

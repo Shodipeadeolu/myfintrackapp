@@ -1,6 +1,18 @@
 .budgets-header { display:flex; align-items:center; justify-content:space-between; padding:20px 20px 6px; flex-shrink:0; }
 .budgets-subtitle { font-size:13px; color:var(--text-secondary); padding:0 20px 10px; flex-shrink:0; }
 
+/* Monthly / Annual view toggle */
+.view-toggle {
+  display:flex; gap:4px; margin:0 20px 12px; padding:3px;
+  background:var(--bg-elevated); border-radius:var(--radius-md); flex-shrink:0;
+}
+.view-toggle-btn {
+  flex:1; padding:8px; font-size:13px; font-weight:700; color:var(--text-muted);
+  border-radius:calc(var(--radius-md) - 3px); transition:all var(--transition);
+}
+.view-toggle-btn.active { background:var(--bg-card); color:var(--text-primary); box-shadow:var(--shadow-sm); }
+.annual-create-hint { font-size:12px; color:var(--text-muted); text-align:center; padding:0 20px 14px; font-style:italic; }
+
 /* ── Compact totals bar ───────────────────────────────────── */
 .bl-totals-bar {
   display:flex; align-items:center; gap:0;
