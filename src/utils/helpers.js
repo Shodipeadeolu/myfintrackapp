@@ -20,6 +20,21 @@ const CURRENCY_SYMBOLS = {
 const getCurrencySymbol = (currency = 'USD') =>
   CURRENCY_SYMBOLS[currency] || currency
 
+// Format a raw amount-input string (e.g. "1234.5") for display with comma
+// grouping on the integer part, WITHOUT touching the decimal part — a plain
+// `parseFloat(raw).toLocaleString()` drops a trailing "." or trailing "0"
+// on every keystroke, which makes it impossible to type "200.50".
+export const formatAmountInput = (raw) => {
+  if (!raw || raw === '-') return raw || ''
+  const neg = raw.startsWith('-')
+  const unsigned = neg ? raw.slice(1) : raw
+  const [intPart, decPart] = unsigned.split('.')
+  const intNum = intPart ? Number(intPart) : 0
+  const formattedInt = isNaN(intNum) ? '0' : intNum.toLocaleString('en-US')
+  const withDecimal = decPart !== undefined ? `${formattedInt}.${decPart}` : formattedInt
+  return neg ? `-${withDecimal}` : withDecimal
+}
+
 export const fmtCurrency = (n, currency = 'USD') => {
   const sym = getCurrencySymbol(currency)
   const abs = Math.abs(n || 0)

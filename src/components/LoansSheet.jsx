@@ -4,7 +4,7 @@ import {
   getLoanAccounts, addLoanAccount, deleteLoanAccount,
   getLoanTxs, addLoanTx
 } from '../firebase/savingsLoans'
-import { fmtCurrency, fmtCurrencyCompact, toFirestoreDate } from '../utils/helpers'
+import { fmtCurrency, fmtCurrencyCompact, toFirestoreDate, formatAmountInput } from '../utils/helpers'
 import { fmtSec } from '../utils/secCurrency'
 import Toast from './Toast'
 import './LoansSheet.css'
@@ -259,7 +259,7 @@ export default function LoansSheet({ onClose }) {
                   <div className="amount-field">
                     <span className="currency-sym">{sym}</span>
                     <input type="text" inputMode="decimal" placeholder="0.00"
-                      value={txAmount ? parseFloat(txAmount.replace(/,/g,'')).toLocaleString('en-US',{maximumFractionDigits:2}) : ''}
+                      value={formatAmountInput(txAmount)}
                       onChange={e => {
                         const raw = e.target.value.replace(/,/g,'').replace(/[^0-9.]/g,'')
                         setTxAmount(raw)

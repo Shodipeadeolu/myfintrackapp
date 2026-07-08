@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import { getTransactions } from '../firebase/service'
 import { getBudgets, addBudget, updateBudget, deleteBudget, getBudgetOverrides, getBudgetOverridesRange, setBudgetOverride, deleteBudgetOverride } from '../firebase/budgets'
-import { fmtCurrency, fmtCurrencyCompact, toFirestoreDate } from '../utils/helpers'
+import { fmtCurrency, fmtCurrencyCompact, toFirestoreDate, formatAmountInput } from '../utils/helpers'
 import { fmtSec } from '../utils/secCurrency'
 import { startOfMonth, endOfMonth, startOfYear, endOfYear, format } from 'date-fns'
 import MonthNavigator from '../components/MonthNavigator'
@@ -551,7 +551,7 @@ function MonthOverrideSheet({ budget, month, monthKey, currentOverride, currency
             <div className="amount-field">
               <span className="currency-sym">{sym}</span>
               <input type="text" inputMode="decimal" placeholder="0.00"
-                value={amount ? parseFloat(amount.replace(/,/g,'')).toLocaleString('en-US',{maximumFractionDigits:2}) : ''}
+                value={formatAmountInput(amount)}
                 onChange={e => setAmount(e.target.value.replace(/,/g,'').replace(/[^0-9.]/g,''))}
                 className="amount-input" autoFocus />
             </div>
@@ -648,7 +648,7 @@ function BudgetSheet({ budget, categories, existingCategories, monthKey, onClose
             <div className="amount-field">
               <span className="currency-sym">{sym}</span>
               <input type="text" inputMode="decimal" placeholder="0.00"
-                value={amount ? parseFloat(amount.replace(/,/g,'')).toLocaleString('en-US',{maximumFractionDigits:2}) : ''}
+                value={formatAmountInput(amount)}
                 onChange={e => setAmount(e.target.value.replace(/,/g,'').replace(/[^0-9.]/g,''))}
                 className="amount-input" autoFocus={!editing} />
             </div>

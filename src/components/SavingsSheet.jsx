@@ -4,7 +4,7 @@ import {
   getSavingsAccounts, addSavingsAccount, deleteSavingsAccount,
   getSavingsTxs, addSavingsTx
 } from '../firebase/savingsLoans'
-import { fmtCurrency, fmtCurrencyCompact, toFirestoreDate } from '../utils/helpers'
+import { fmtCurrency, fmtCurrencyCompact, toFirestoreDate, formatAmountInput } from '../utils/helpers'
 import { fmtSec } from '../utils/secCurrency'
 import Toast from './Toast'
 import './SavingsSheet.css'
@@ -204,9 +204,7 @@ export default function SavingsSheet({ onClose }) {
                   <span className="currency-sym">{sym}</span>
                   <input
                     type="text" inputMode="decimal" placeholder="0.00"
-                    value={openingBalance
-                      ? parseFloat(openingBalance.replace(/,/g,'')).toLocaleString('en-US',{maximumFractionDigits:2})
-                      : ''}
+                    value={formatAmountInput(openingBalance)}
                     onChange={e => {
                       const raw = e.target.value.replace(/,/g,'').replace(/[^0-9.]/g,'')
                       setOpeningBalance(raw)
@@ -278,9 +276,7 @@ export default function SavingsSheet({ onClose }) {
                   <div className="amount-field">
                     <span className="currency-sym">{sym}</span>
                     <input type="text" inputMode="decimal" placeholder="0.00"
-                      value={txAmount
-                        ? parseFloat(txAmount.replace(/,/g,'')).toLocaleString('en-US',{maximumFractionDigits:2})
-                        : ''}
+                      value={formatAmountInput(txAmount)}
                       onChange={e => {
                         const raw = e.target.value.replace(/,/g,'').replace(/[^0-9.]/g,'')
                         setTxAmount(raw)

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import { addTransaction, updateTransaction, deleteTransaction } from '../firebase/service'
-import { toFirestoreDate, fmtCurrency } from '../utils/helpers'
+import { toFirestoreDate, fmtCurrency, formatAmountInput } from '../utils/helpers'
 import CategoryPicker from './CategoryPicker'
 import Toast from './Toast'
 import './AddTransaction.css'
@@ -150,11 +150,7 @@ export default function AddTransaction({ tx, onClose, onSaved }) {
             <span className="currency-sym">{getSym(currency || 'USD')}</span>
             <input
               type="text" inputMode="decimal" placeholder="0.00"
-              value={
-                !amount || amount === '-' ? amount
-                : isNaN(parseFloat(amount)) ? ''
-                : parseFloat(amount).toLocaleString('en-US', {maximumFractionDigits:2})
-              }
+              value={formatAmountInput(amount)}
               onChange={e => {
                 // Strip commas, keep a leading minus sign, digits, and one decimal point
                 const negative = e.target.value.trim().startsWith('-')

@@ -25,3 +25,17 @@ export function calcLoanBalance(transactions) {
   return transactions.filter(t => t.type === 'loans').reduce((total, t) =>
     t.subtype === 'repay' ? total - t.amount : total + t.amount, 0)
 }
+
+/**
+ * Cash effect of dedicated savings/loan account transactions (separate
+ * collections from the main transactions list, so they never count as
+ * income/expense) — deposit/repay moves cash out, withdraw/borrow moves
+ * cash in.
+ */
+export function calcSavingsLoansCashEffect(savingsTxs, loanTxs) {
+  const savingsEffect = savingsTxs.reduce((total, t) =>
+    t.subtype === 'withdraw' ? total + t.amount : total - t.amount, 0)
+  const loanEffect = loanTxs.reduce((total, t) =>
+    t.subtype === 'borrow' ? total + t.amount : total - t.amount, 0)
+  return savingsEffect + loanEffect
+}
