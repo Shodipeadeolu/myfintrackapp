@@ -31,7 +31,7 @@ export function useAppUpdate() {
     }
     setChecking(true)
     try {
-      const res = await fetch('/myfintrackapp/?_=' + Date.now(), {
+      const res = await fetch(import.meta.env.BASE_URL + '?_=' + Date.now(), {
         cache: 'no-store', headers: { 'Cache-Control': 'no-cache' }
       })
       const html = await res.text()
